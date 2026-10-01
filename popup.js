@@ -265,7 +265,12 @@ window.addEventListener('keydown', (event) => {
  */
 async function pingActiveTab() {
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    // 本页可能以独立 popup 窗口运行（Firefox 点图标走 windows.create，IME 才能用），
+    // currentWindow 是这个没有标签页的小窗 —— 探针要打在最近聚焦的**普通**浏览器窗口上
+    const wins = await chrome.windows.getAll({ populate: true })
+    const normal = wins.filter((w) => w.type === 'normal')
+    const target = normal.find((w) => w.focused) ?? normal[normal.length - 1]
+    const tab = target?.tabs?.find((t) => t.active)
     if (!tab?.id) return { injected: false, special: true }
     const replied = await Promise.race([
       chrome.tabs

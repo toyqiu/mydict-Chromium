@@ -80,3 +80,15 @@ export function isValidBase(raw) {
     return false
   }
 }
+
+/**
+ * 给 `chrome.permissions.request` 用的 origin 匹配串：`https://host:port/*`。
+ *
+ * Chrome MV3 里 host_permissions 已安装即授予，request 会静默通过；
+ * Firefox MV3 的 host 权限是可选的，必须经 request（用户手势）授予，
+ * 否则 background 的跨域 fetch 与 content script 都不会生效。
+ */
+export function originPattern(base) {
+  const url = new URL(normalizeBase(base))
+  return `${url.origin}/*`
+}

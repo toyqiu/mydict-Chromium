@@ -1,234 +1,106 @@
-# MyDict Extension
+# MyReader 划词查词（Chrome 扩展）
 
-把 [MyReader](https://github.com/PoxenStudio/MyReader) 电子书阅读器里的「划词查词」体验
-搬进 Chromium 浏览器的 Chrome 扩展（Manifest V3）。划选任意网页上的词，用**你自建的
-[MyDict](https://github.com/PoxenStudio/mydict) 词典服务**查释义、看扫描图、听发音、
-收生词本——不依赖任何第三方翻译接口。
-
-纯 JavaScript、**零构建**：改完代码在 `chrome://extensions` 点一下刷新即可生效。
-
----
-
-## 截图
-<img width="205" height="176" alt="image" src="https://github.com/user-attachments/assets/f9d35f68-9562-4551-85d5-f9403086461f" />
-<img width="511" height="725" alt="image" src="https://github.com/user-attachments/assets/1ab16cb0-07d5-449b-b7c2-9de2b1b6ac6d" />
-<img width="1055" height="996" alt="image" src="https://github.com/user-attachments/assets/25e8b23e-6f4a-4e1e-83a5-4ac31f53faf1" />
-<img width="1045" height="977" alt="image" src="https://github.com/user-attachments/assets/5a6e25a9-5a28-4e78-9520-a44ac2062df9" />
-<img width="1421" height="992" alt="image" src="https://github.com/user-attachments/assets/43289fbf-2e9b-4a0b-a459-00b0488ced62" />
-
-
-## 功能
-
-### 查词入口（四个，按需选用）
-
-| 入口 | 行为 |
-|---|---|
-| 划选（默认） | 选中文字后，选区旁浮出小圆标，点它弹出查词面板 |
-| 双击 | 双击一个词，直接弹出面板 |
-| 工具栏图标 | 弹出带搜索框的弹窗，**任何页面都能用**（包括 chrome:// 新标签页这类无法注入脚本的页面） |
-| 右键菜单 | 选区上「用 MyDict 查『所选词』」；页面右键「MyDict 设置」 |
-
-### 查词面板
-
-- **按词典分组折叠**：一次查询命中几十部词典时按词典分组、默认展开第一组，右上角显示词条数
-- **语言标签页**：命中多语种时顶部出现「全部 / 中文 / 日本語 / English…」标签，默认选中与页面语言一致的语种，点击即过滤
-- **键盘导航**：`↑`/`↓` 在命中的词典分组间切换（关掉当前组、展开相邻组，到头绕回）；`←`/`→` 切换语言标签
-- **词条 HTML 原样渲染**：每个词典一个独立的 shadow root，词典自带的 CSS 互不污染，也不会泄漏到页面上
-- **图片交互**（对 MDict 转制词典的兼容，牛津高阶第 9/10 版实测）：
-  - 牛津「拓展图」：点缩略图 → 原地展开大图；点展开后的全图 → 弹全屏查看器；图旁「收起」按钮收回
-  - 单张大图（辞海整页扫描等）：点击直接弹全屏查看器
-- **全屏图片查看器**：滚轮缩放（锚定光标）、拖动平移、`←`/`→` 翻页、`Esc` 或点空白退出——扫描版词典整页 3383×5219 的图也能放大了读标注小字
-- **发音**：点词条里的音标/音频链接即播；`.mp3 → .opus → .spx` 候选链自动回退（`.spx` 的 JS 解码尚未接线，见「已知限制」）
-- **生词本 ☆**：每个词典分组右上角一颗星，点击收藏到 MyDict 生词本（★ = 已收藏，再点取消）。发的是该词典自己的**词头**而不是选区原文——生词本按 `(owner, dictionary_id, word)` 唯一
-- **暗色模式**：面板、弹窗、滚动条全部跟随系统主题（也可在设置里强制浅色/深色）
-- **交叉引用**：`entry://` 链接在面板内就地继续查，`‹` 返回上一个词
-
-### 细节
-
-- 弹窗查询与划词面板共用同一套渲染层，行为完全一致
-- 弹窗打不开查词脚本的页面会**直接显示原因**（未刷新的旧标签页 / 网站访问权限受限 / 页面类型不支持），而不是无声失败
-- 弹窗自身出错时错误信息以红字显示在弹窗里，方便回报
-
----
+划选网页上的词，弹出查词面板：按词典分组显示自建 MyDict 的释义、看发音、收进生词本。
+交互与 MyReader 阅读器里的查词面板一致（同样的分组折叠、shadow 样式隔离、生词本星标）。
 
 ## 安装
 
-1. 下载本仓库（`git clone` 或下载 zip 解压）
-2. 打开 `chrome://extensions`，右上角开启**开发者模式**
-3. 点「**加载已解压的扩展程序**」，选择本仓库目录（含 `manifest.json` 的那一层）
-4. （可选）点工具栏拼图图标，把「MyReader 划词查词」图钉固定到工具栏
-5. 点扩展图标 → 「打开设置」→ 填入 MyDict 地址与 Token → 保存
+1. 打开 `chrome://extensions`，右上角打开「开发者模式」
+2. 点「加载已解压的扩展程序」，选择本目录（`chrome/`）
+3. 点扩展图标 → 打开设置 → 填 **MyDict 地址** 与 **Token** → 保存
 
-> **网站访问权限**：本扩展在 manifest 里声明了 `host_permissions: ["<all_urls>"]`
-> （安装即授予，安装时会提示「读取和更改您在所有网站上的数据」——查词必须在任意网页
-> 上运行，这是必要的）。如果划选没反应，先到扩展「详情」→「网站访问权限」确认是
-> 「**在所有网站上**」，并刷新一次安装扩展之前就开着的标签页。
+保存即可。安装时会提示「读取和更改您在所有网站上的数据」——这是本扩展能注入任意网页
+划词、并能直连你的 MyDict 服务器所必需的。
 
-## 配置
+## 使用
 
-| 设置项 | 说明 |
+- **划选**一个词 → 选区旁浮出小圆标 → 点它出面板
+- **双击**一个词 → 直接出面板
+- **点扩展图标**（或按 `Alt+Shift+D`）→ 弹出搜索框，输入词回车查询
+- **右键** → 「用 MyDict 查『所选词』」直接查；「MyDict 设置」进设置页
+- 面板里：
+  - 顶部是**语言标签页**（全部 / 中文 / 日本語 / English），默认选中与页面语言一致的那组
+  - 每部词典一个**折叠分组**，右上角 ☆ 收进生词本（★ = 已收藏，再点取消）
+  - 点词条里的**音标/音频链接**就发音
+  - 词典自带的**交叉引用**（`entry://`）点击后在面板内继续查，`‹` 返回上一个词
+- `Esc`、点击面板外、或选区滚出视口，都会关闭面板
+
+## 配置项
+
+| 项 | 说明 |
 |---|---|
-| MyDict 地址 | 例如 `https://mydict.example.com:999/`（`http` 局域网地址也可以） |
-| Token | MyDict 网页「Token 管理」里生成。不填也能查词（MyDict 开匿名查询时），但生词本一定需要 |
-| 触发方式 | 划选浮标（默认）/ 划选即弹 / 双击 |
-| 面板宽度 / 字号 | 按喜好调整 |
-| 发音 | 关掉后不接管音频链接 |
-| 输入框内禁用 | 划选发生在输入框里时不触发 |
+| MyDict 地址 | 填到域名端口即可；带不带 `/api/v1/query` 都认。**建议用 HTTPS 入口**——HTTP 地址在 HTTPS 网页上加载不了词典的图片和样式（mixed content） |
+| Token | 查词可以留空（服务端开了匿名访问时）；**生词本必须填** |
+| 触发方式 | 浮标 / 双击 / 划选即弹 |
+| 面板宽度 / 词条字号 | |
+| 发音开关 | |
+| 输入框内禁用 | |
 | 站点黑名单 | 一行一个域名，含其子域 |
 
-配置存在 `chrome.storage.local`，**不同步上云**（Token 是密钥，不出本机）。
+配置存在 `chrome.storage.local`，**不同步上云**（Token 是密钥）。
 
----
+### 发音链路说明
 
-## 它是怎么工作的
+词条里的发音锚点（`.mp3` 直链、千篇的 `data-mp3`、`.spx`）都由扩展拦截后用
+一个**全页共用的 `<audio>` 播放器**播放——挂在 `document.documentElement` 上、
+由扩展持有引用。早先版本每次点击 `new Audio()` 造一个无引用元素，处理函数一返回
+就可能被 GC 回收，播放中断，表象就是「点了没声音」。
 
-三个决定扩展形态的实测事实：
+`.spx` 依次试同名 `.mp3` → `.opus` → 本体；被自动播放策略拦下时会明确提示
+「播放被浏览器拦截」，而不是静默。
 
-1. **MyDict 的 `/api/v1/query` 不返回任何 CORS 头** → 页面里（content script）调不了，
-   查询与生词本请求全部经 **background service worker** 代理（扩展后台持有 host 权限，
-   不受 CORS 限制）。
-2. **`/dict-res/{id}/res/{path}`（词典图片/CSS/音频）不需要鉴权**，且响应带
-   `Access-Control-Allow-Origin: *` → 词条里引用的资源直接改写成 MyDict 的**绝对地址**，
-   不需要中继，词典 CSS 里的相对 `url()` 也能自然解析。
-3. **词典 CSS 会互相污染**（MDict 转制词典爱用裸元素选择器）→ 面板骨架一个 shadow
-   root，**每个词典再各一个** shadow root；折叠骨架（`<details>`、语言标签）留在面板层，
-   词典内容进各自的 scope，牛津的 `details{display:inline-block}` 这类规则就打不到骨架。
+## 实现说明
 
-### 划词面板的图片点击分流
-
-MDict 转制的牛津高阶词条里，「拓展图」是成对结构——缩略图 + `display:none` 的全图，
-展开/收起靠**词条自带的 JS**（`toggle_enlarger` / `expand_big` / `expand_thumb`）。
-扩展渲染词条时脚本与 `onclick` 属性会被 DOMPurify 剥掉，所以这套交互要由扩展自己接，
-而且有一个网页版用 iframe 踩过的坑在这里同样成立：
-
-> **不能依赖 `event.target` 是 `<img>`。** 真实鼠标点击命中的是悬停放大镜角标
-> （`.ox-enlarge-label`）、`<a>` 或容器本身——只有合成事件的 target 才恰好是 img。
-
-因此点击监听挂在词条内容容器的**捕获阶段**，按容器分流：
-
-- 可见图是全图（展开态）→ `stopPropagation` 拦掉词典的「缩回去」，弹全屏查看器
-- 可见图是缩略图（收起态）→ 原地展开（展开/收起由扩展代劳，词条 JS 已被剥掉）
-- 链接包裹的图 → 让给链接逻辑（`entry://` 就地查、外链新标签页）
-- 其余无链接包裹、渲染尺寸 ≥160px 的 `<img>` → 直接弹查看器
-
-### 其它值得一提的实现点
-
-- **反悬浮广告扩展的对抗**：部分广告拦截扩展会注入样式表，把所有 `position:fixed`
-  元素一律改成 `absolute` 并 `display:none !important`——浮标和面板宿主的关键属性全部
-  用**内联 `!important`** 声明（内联 important 优先级更高），否则在装了这类扩展的机器上
-  整个界面静默消失。
-- **弹窗查看大图走独立标签页**：弹窗本身是 460px 小窗，扫描图在弹窗内永远放不大——
-  点大图时 `chrome.tabs.create` 打开 `lightbox.html`，独立标签页里遮罩才是真全屏。
-- **分层兜底的错误自诊**：`popup-boot.js` 先于主模块注册 error/unhandledrejection
-  钩子，把弹窗的任何失败渲染成可见红字；主模块再向当前页面发探针，注入失败时说明原因。
-- **oald10.css 的坑**：`.thumb{display:none}` 和 `.fullsize{display:none}` 同时存在，
-  网页版靠词条自带 JS 在初始化时显示缩略图；扩展里用内联 `!important` 强制恢复。
-
----
-
-## Firefox 版（XPI）
-
-同一套代码的 Gecko（Manifest V3）移植版。Release 资产里的
-`MyDict-Extension-<版本>-fx.xpi` 已经过 **Mozilla（AMO）签名**——任何 Firefox
-（含 Release 正式版）都能直接永久安装，无未验证警告。
-
-**安装**：Firefox → `about:addons` → 齿轮图标 → 「从文件安装附加组件」→ 选 XPI。
-
-Firefox 专属注意：
-
-1. **站点授权**：Firefox MV3 的 host 权限是可选的。首次在设置页保存时扩展会请求
-   站点访问权限，**请允许**；如果之前拒绝过，到 `about:addons` → MyReader 划词查词 →
-   权限 手动开启。不授权的话 background 跨域请求与 content script 都不会生效
-   （面板会显示「连不上 MyDict」）。
-2. **MyDict 地址请用 HTTPS 入口**：扩展页面是安全上下文，HTTP 地址的请求会被
-   Firefox 按 mixed content 拦截（Chromium 版无此限制，局域网 HTTP 地址可用）。
-3. background 使用事件页（event page）而非 service worker，manifest 做了双端适配。
----
-
-## 目录结构
+MV3、纯 JS 免构建——`chrome/` 目录直接加载，改完在 `chrome://extensions` 点一下刷新即可。
+无打包器、无 node_modules（`package.json` 只给 `node --test` 用）。
 
 ```
-manifest.json          MV3 清单（权限、content_scripts、commands、web_accessible_resources）
-background.js          Service worker 入口：消息路由 + 右键菜单
-background/
-  router.js            消息分发与错误收敛（所有 handler 不抛出，统一 {ok, code, message}）
-  mydict-client.js     MyDict HTTP 客户端（query / vocab 增删查 / 测试连接）
-  cache.js             查询结果内存缓存（TTL + 上限）
-content.js             content script 引导：按需动态 import 其余模块
-content/
-  app.js               装配：设置热更新、划选/双击入口、消息监听
-  selection.js         选区捕获与整词提取（Intl.Segmenter）、可编辑区排除、站点黑名单
-  trigger-icon.js      选区旁的浮出小圆标
-  position.js          面板定位（上下翻转、视口 clamp、滚动跟随）+ 免疫内联样式工具
-  panel.js             面板外壳（自身 shadow root、状态机、Esc/点外关闭、键盘导航）
-  vocab.js             生词本能力（listSaved / add / remove，状态对账）
-render/                与弹窗共用的渲染层
-  renderer.js          结果 → 分组折叠 + 语言标签 + 每词典独立 shadow scope
-  sanitize.js          DOMPurify 白名单清洗（放行词典自定义元素、保住 entry://）
-  resources.js         词条自带 <style>/<link> 回挂 + 资源相对地址改写为绝对地址
-  styles.js            面板样式（主题令牌、暗色、滚动条）+ 词典兼容 CSS
-  links.js             entry:// / 锚点 / 外链处理
-  audio.js             发音（mp3→opus→spx 候选链、共享 <audio> 播放器）
-  expandable.js        牛津拓展图：捕获阶段容器分流（展开/收起/幻灯片）
-  images.js            大图收集（渲染尺寸 ≥160、去重、翻页表）
-  lightbox.js          全屏图片查看器（缩放/平移/翻页/ immune styles）
-  vocab-star.js        分组右上角的生词本 ☆
-  dark-theme.js        暗色模式下词典内容的颜色适配
-core/                  纯逻辑、无 DOM，可单测
-  protocol.js          消息类型与错误码
-  settings.js          chrome.storage.local 读写 + 默认值
-  mydict-url.js        地址规范化与 URL 构造
-  lookup-candidates.js 查询候选词（trim → 大小写 → 词形还原，50 字上限）
-  lemmatize.js         英语词形还原
-options.html/.js/.css  设置页
-popup.html/.js/.css    工具栏弹窗（搜索框 + 结果，与面板同渲染层）
-popup-boot.js          弹窗错误自诊（先于主模块注册钩子）
-lightbox.html/-page.js 独立标签页版查看器（popup 点大图时打开）
-tests/                 node --test 单测 + 验证页 fixture
-vendor/                DOMPurify（ESM）、libspeex-js 三件套（spx 解码备用）
+content script（页面内，隔离世界）          service worker（特权上下文）
+  选区捕获 / 浮标 / 面板外壳        ⇄ 消息 ⇄   查 mydict（无 CORS 限制）
+  词典渲染（两层 shadow 隔离）                 生词本增删查 / 短期缓存
 ```
 
----
-
-## 开发与测试
-
-```bash
-# 单元测试（core/ 纯逻辑，21 例）
-node --test tests/unit/
-
-# 端到端验证
-# tests/fixture.html 是验证页：划选其中的词即可触发完整链路；
-# tests/csp-fixture.html 模拟严格 CSP 站点（content script 不受页面 CSP 约束）；
-# tests/dark-harness.html 单独验证主题令牌与滚动结构。
-python3 -m http.server 18080 --directory tests
-```
-
-改完代码 → `chrome://extensions` 点扩展卡片上的刷新（⟳）→ 刷新目标网页。
-无需任何构建步骤。
+- **查询走 service worker**：`/api/v1/query` 不返回 CORS 头，页面里调不了；
+  扩展后台有 host 权限，跨域不受限。
+- **词典资源（图片/CSS/字体/音频）不走代理**：`/dict-res/…` 在 MyDict 上是公开只读的
+  （不校验 token）且带 `Access-Control-Allow-Origin: *`，直接改写成绝对地址即可，
+  词典 CSS 里的相对 `url(…)` 也能自然解析正确。
+- **两层 shadow 隔离**：面板整体一个 shadow root（挡页面 CSS）；**每个词典再一个**
+  （挡词典互相污染——词典爱用裸元素选择器，共用一个 scope 会让 A 词典的 CSS 重排
+  B 词典的列表）。折叠骨架（`<details>`）留在面板层，免得被词典的
+  `details{display:inline-block}` 之类规则打崩。
+- **HTML 清洗**用 DOMPurify 默认白名单 + 词条自定义元素（`chn`/`o10`/…），
+  `script`/`iframe`/表单/`on*` 处理器全去；`link`/`style` 被单独挑出来挂进各自的 shadow。
 
 ### 已知限制
 
-- `.spx` 音频目前依赖服务端的同名 `.mp3` 兜底；纯 spx 词典需要接线 `vendor/speex/`
-  的 libspeex-js 解码（脚本已就位，未挂到播放链路）
-- iframe 内嵌页面（`<iframe>` 里的内容）不注入，划选不生效
-- `chrome://`、Web Store、PDF 查看器等页面无法注入（弹窗查询不受影响）
+- **不覆盖 PDF / 浏览器内置查看器**（拿不到选区）；iframe 页面默认不注入
+- mydict 若配成 **HTTP** 地址，在 **HTTPS 页面**上词典的图片/样式会被拦（mixed content）——
+  当前你的 HTTPS 入口不受影响
+- `.spx` 音频：mydict 对 `.mp3` 请求有「同名 `.spx`」兜底，且 SPX 目录通常有同名 `.mp3`，
+  所以候选链 `.mp3 → .opus → .spx` 基本够用；真正的 Speex JS 解码（`vendor/speex/`）尚未接上
+- 每次查询上限 50 字
 
----
+## 测试
 
-## 隐私与安全
+```bash
+cd chrome
+/vol1/@appcenter/nodejs_v22/bin/node --test     # core/ 纯逻辑单测（21 例）
+```
 
-- 查询词、Token 只在你配置的 MyDict 服务器与浏览器之间传输，不经过任何第三方
-- Token 存 `chrome.storage.local`，不上云同步
-- 外链新标签页打开时带 `rel="noopener noreferrer"`；词典资源请求不带 referrer
-- 仓库中不含任何真实服务器地址或凭据
+端到端：`tests/fixture.html`（`http://127.0.0.1:18080/`）——划选/双击里面的词验证面板；
+`tests/unit/` 是纯逻辑单测。
 
-## 致谢
+## 目录
 
-- [MyReader](https://github.com/PoxenStudio/MyReader) / [MyDict](https://github.com/PoxenStudio/mydict) ——
-  划词查词面板与词典服务的原型，渲染层移植自其 `renderMyBooksResults`
-- mydict 网页版的 `iframe_bootstrap.js` 点击分流算法与 `ImageLightbox.vue` 查看器
-- [DOMPurify](https://github.com/cure53/DOMPurify)、[libspeex-js](https://github.com/janpus/libspeex)（vendored）
-
-## License
-
-MIT
+```
+manifest.json        MV3 清单（权限、host_permissions、web_accessible_resources）
+background.js        SW 入口
+background/          router（消息路由）· mydict-client（HTTP）· cache
+core/                两侧共用：protocol · settings · mydict-url · lookup-candidates · lemmatize
+content.js           content script 入口（动态 import 下面这些）
+content/             选区捕获 · 浮标 · 定位 · 面板外壳 · 生词本能力
+render/              渲染层：分组+shadow · 清洗 · 资源改写 · 发音 · 链接 · 暗色适配
+vendor/              DOMPurify(ESM) · libspeex-js（spx 解码，暂未接线）
+icons/               取自 MyDict 的 logo
+```

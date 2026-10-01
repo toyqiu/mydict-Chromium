@@ -5,7 +5,7 @@
 
 import { CODE, MSG } from './core/protocol.js'
 import { DEFAULTS, getSettings, setSettings } from './core/settings.js'
-import { isValidBase, normalizeBase } from './core/mydict-url.js'
+import { isValidBase, normalizeBase, originPattern } from './core/mydict-url.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -78,6 +78,24 @@ async function onSave() {
   if (patch.baseUrl && !isValidBase(patch.baseUrl)) {
     setStatus(status, '地址不是合法的 http(s) URL', 'error')
     return
+  }
+
+  // host 站点授权：Firefox MV3 的 host_permissions 是可选的，必须经 request（用户
+  // 手势）授予，否则 background 跨域 fetch 与 content script 都不生效；Chrome 里
+  // 已由 host_permissions 安装即授予，request 静默通过。地址留空（纯清空配置）时跳过。
+  if (patch.baseUrl) {
+    try {
+      const granted = await chrome.permissions.request({
+        origins: [originPattern(patch.baseUrl)],
+      })
+      if (!granted) {
+        setStatus(status, '需要授权访问该服务器才能查词', 'error')
+        return
+      }
+    } catch (error) {
+      setStatus(status, `授权失败：${error?.message || error}`, 'error')
+      return
+    }
   }
 
   await setSettings(patch)

@@ -1,42 +1,45 @@
 {
   "manifest_version": 3,
   "name": "MyReader 划词查词",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "划选网页上的词，用自建 MyDict 查释义、看发音、收进生词本。",
   "minimum_chrome_version": "116",
-
-  "permissions": ["storage", "contextMenus"],
-
-  "host_permissions": ["<all_urls>"],
-
+  "permissions": [
+    "storage",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"
   },
-
   "options_page": "options.html",
-
   "commands": {
     "_execute_action": {
-      "suggested_key": { "default": "Alt+Shift+D" },
+      "suggested_key": {
+        "default": "Alt+Shift+D"
+      },
       "description": "打开查词搜索框"
     }
   },
-
   "action": {
     "default_title": "MyReader 划词查词",
     "default_popup": "popup.html"
   },
-
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     }
   ],
-
   "web_accessible_resources": [
     {
       "resources": [
@@ -46,10 +49,11 @@
         "vendor/purify.es.mjs",
         "vendor/speex/*.js"
       ],
-      "matches": ["<all_urls>"]
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
-
   "icons": {
     "16": "icons/16.png",
     "32": "icons/32.png",

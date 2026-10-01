@@ -28,7 +28,15 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.settings) resetCache()
 })
 
-// 左键点扩展图标弹 popup（manifest 的 default_popup），所以这里没有 onClicked。
+// 工具栏图标：Chromium 用 manifest 的 default_popup（弹面板，IME 正常）；
+// Firefox 上 default_popup 的弹出面板是原生 popup 窗口，**Linux 上 IME 无法组字**
+// （fcitx/ibus 都打不进中文日文，Firefox 平台限制，扩展侧无解），所以点击事件在
+// Firefox 会走到这里 —— 改开一个真正的 popup 小窗口承载同一套 popup.html，
+// 普通窗口里 IME 正常。Chromium 因 default_popup 存在，onClicked 永不触发，两不误。
+chrome.action.onClicked.addListener(() => {
+  chrome.windows.create({ url: 'popup.html', type: 'popup', width: 480, height: 640 })
+})
+
 // 右键扩展图标 → 「MyDict 设置」；右键页面选区 → 直接查。
 
 function ensureContextMenu() {
