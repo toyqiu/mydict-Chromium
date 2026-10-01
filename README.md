@@ -9,6 +9,14 @@
 
 ---
 
+## 截图
+<img width="205" height="176" alt="image" src="https://github.com/user-attachments/assets/f9d35f68-9562-4551-85d5-f9403086461f" />
+<img width="511" height="725" alt="image" src="https://github.com/user-attachments/assets/1ab16cb0-07d5-449b-b7c2-9de2b1b6ac6d" />
+<img width="1055" height="996" alt="image" src="https://github.com/user-attachments/assets/25e8b23e-6f4a-4e1e-83a5-4ac31f53faf1" />
+<img width="1045" height="977" alt="image" src="https://github.com/user-attachments/assets/5a6e25a9-5a28-4e78-9520-a44ac2062df9" />
+<img width="1421" height="992" alt="image" src="https://github.com/user-attachments/assets/43289fbf-2e9b-4a0b-a459-00b0488ced62" />
+
+
 ## 功能
 
 ### 查词入口（四个，按需选用）
