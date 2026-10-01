@@ -1,4 +1,4 @@
-# MyDict-Chromium
+# MyDict Extension
 
 把 [MyReader](https://github.com/PoxenStudio/MyReader) 电子书阅读器里的「划词查词」体验
 搬进 Chromium 浏览器的 Chrome 扩展（Manifest V3）。划选任意网页上的词，用**你自建的
@@ -129,7 +129,7 @@ MDict 转制的牛津高阶词条里，「拓展图」是成对结构——缩�
 ## Firefox 版（XPI）
 
 同一套代码的 Gecko（Manifest V3）移植版，Release 资产里的
-`MyDict-Chromium-<版本>-fx.xpi`。
+`MyDict-Extension-<版本>-fx.xpi`。
 
 - **临时安装**：`about:debugging` → 此 Firefox → 「临时载入附加组件」→ 选 XPI（重启失效）
 - **永久安装**：Firefox Release 强制签名；Developer Edition / Nightly 里将
