@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>划词查词 · 验证页</title>
+    <style>
+      body {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 40px 20px 120vh;
+        font: 16px/1.9 -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        color: #1b1b1b;
+      }
+      h1 { font-size: 20px; }
+      .en { font-family: Georgia, serif; }
+      .note { color: #666; font-size: 13px; }
+      /* 顶部/底部的锚点段落：用来验证面板的上下翻转 */
+      #top, #bottom { outline: 1px dashed #ccc; padding: 6px; }
+    </style>
+  </head>
+  <body>
+    <h1>划词查词 · 验证页</h1>
+    <p class="note">
+      用鼠标划选下面任意一个词，或双击它。默认行为是浮出一个小圆标，点它出面板。
+    </p>
+
+    <p id="top">
+      顶部的锚点段落：请在这里划选 <b>temporary</b> 或 <b>house</b> 或 <b>骨格</b>，
+      面板应该朝<strong>下</strong>展开。
+    </p>
+
+    <p>
+      中文段落：这段文字里可以划选
+      <b>政府</b>、<b>小津</b>、<b>人気</b> 这类词，看看中日词典是否同时命中，
+      以及语言标签页会不会出现。
+    </p>
+
+    <p class="en">
+      English paragraph: try selecting
+      <b>run</b>, <b>ran</b>, <b>Hello</b>, or <b>world</b> — the normaliser should
+      find the headword even with different case or an inflected form.
+    </p>
+
+    <p>
+      输入框排除：下面这个输入框里划词不应该触发。
+      <input type="text" value="在输入框里划选 temporary 不应触发" style="width: 100%" />
+    </p>
+
+    <p id="bottom">
+      底部的锚点段落：请在这里划选 <b>temporary</b>，
+      面板应该朝<strong>上</strong>展开（下方空间不够）。
+    </p>
+    <div style="height: 60vh"></div>
+  </body>
+</html>

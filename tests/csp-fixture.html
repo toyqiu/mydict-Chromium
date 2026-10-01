@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <!-- 严格 CSP：模拟 GitHub/Google 这类站点，script-src 不含扩展 origin -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'">
+  <title>划词查词 · CSP 页</title>
+  <style>body{max-width:720px;margin:40px auto;font:16px/1.9 sans-serif;color:#111}</style>
+</head>
+<body>
+  <h1>带 CSP 的验证页</h1>
+  <p>请划选 <b>temporary</b> 这个词。如果浮标没出现，说明扩展的 content script 在严格 CSP 的页面上加载失败。</p>
+  <p id="marker">这一行是给脚本定位用的锚点。</p>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "myreader-extension-chrome",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MyReader 划词查词的 Chrome 扩展（MV3）。扩展本身免构建，这个 package.json 只给 node 跑单元测试用。",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

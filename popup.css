@@ -1,0 +1,22 @@
+/* 弹窗外壳的尺寸。内部样式全在 popup.js 注入的 shadow 里（PANEL_CSS）。 */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 460px;
+  background: #f6f8f7;
+}
+
+/* 跟随系统暗色：面板本体用的是 shadow 里的主题变量，这里只是让弹窗加载瞬间
+   和结果不满一屏时不露白边 */
+@media (prefers-color-scheme: dark) {
+  html,
+  body {
+    background: #1b2126;
+  }
+}
+
+#host {
+  display: block;
+}

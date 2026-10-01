@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>MyReader 划词查词 · 设置</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <header class="page-head">
+        <img src="icons/48.png" alt="" width="36" height="36" />
+        <div>
+          <h1>MyReader 划词查词</h1>
+          <p class="muted">划选网页上的词，用自建 MyDict 查释义、看发音、收进生词本。</p>
+        </div>
+      </header>
+
+      <section class="card">
+        <h2>词典服务</h2>
+
+        <label class="field">
+          <span class="label">MyDict 地址</span>
+          <input
+            id="baseUrl"
+            type="url"
+            spellcheck="false"
+            placeholder="https://dict.example.com:999/"
+            autocomplete="off"
+          />
+          <span class="hint">
+            填到域名端口就行，带不带 <code>/api/v1/query</code> 都可以。建议用 HTTPS
+            入口——HTTP 地址在 HTTPS 网页上加载不了词典的图片和样式。
+          </span>
+        </label>
+
+        <label class="field">
+          <span class="label">Token</span>
+          <input id="token" type="password" spellcheck="false" autocomplete="off" placeholder="sk-…" />
+          <span class="hint">
+            在 MyDict 网页右上角用户菜单的「Token 管理」里生成。查词可以留空（服务端开了匿名访问时），
+            但<b>生词本一定要填</b>。
+          </span>
+        </label>
+
+        <div class="row">
+          <button id="test" type="button" class="secondary">测试连接</button>
+          <span id="testResult" class="status" role="status"></span>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>触发方式</h2>
+
+        <div class="field">
+          <span class="label">什么时候查</span>
+          <label class="radio">
+            <input type="radio" name="trigger" value="icon" />
+            <span>
+              <b>划选后浮出小图标，点它才查</b>
+              <span class="hint">推荐。不打扰浏览，误触最少。</span>
+            </span>
+          </label>
+          <label class="radio">
+            <input type="radio" name="trigger" value="dblclick" />
+            <span>
+              <b>双击选中一个词就直接查</b>
+              <span class="hint">普通划选不触发。</span>
+            </span>
+          </label>
+          <label class="radio">
+            <input type="radio" name="trigger" value="auto" />
+            <span>
+              <b>划选完立刻弹面板</b>
+              <span class="hint">和阅读器里一致，但在网页上比较打扰。</span>
+            </span>
+          </label>
+        </div>
+
+        <label class="check">
+          <input id="disableInInputs" type="checkbox" />
+          <span>在输入框 / 可编辑区域里划词时不触发</span>
+        </label>
+
+        <label class="field">
+          <span class="label">站点黑名单</span>
+          <textarea id="blocklist" rows="3" spellcheck="false" placeholder="example.com&#10;mail.test.cn"></textarea>
+          <span class="hint">一行一个域名，会在该域名及其子域下整站禁用。留空即全部站点启用。</span>
+        </label>
+      </section>
+
+      <section class="card">
+        <h2>面板</h2>
+
+        <label class="field">
+          <span class="label">面板宽度：<output id="panelWidthOut"></output> px</span>
+          <input id="panelWidth" type="range" min="320" max="720" step="20" />
+        </label>
+
+        <label class="field">
+          <span class="label">词条字号：<output id="fontScaleOut"></output></span>
+          <input id="fontScale" type="range" min="0.8" max="1.4" step="0.05" />
+        </label>
+
+        <label class="check">
+          <input id="enableAudio" type="checkbox" />
+          <span>点词条里的音标就发音（.mp3 直放；.spx 需要解码，首次会慢一点）</span>
+        </label>
+      </section>
+
+      <div class="actions">
+        <button id="save" type="button" class="primary">保存</button>
+        <span id="saveStatus" class="status" role="status"></span>
+      </div>
+
+      <footer class="muted small">
+        点扩展图标可以直接打开这一页。配置存在浏览器本地，不会同步到云端（Token 是密钥）。
+      </footer>
+    </main>
+
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

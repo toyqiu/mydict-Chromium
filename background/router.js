@@ -1,0 +1,116 @@
+/**
+ * 消息路由：content / options → background 的唯一入口。
+ *
+ * 查询在这里做**候选词循环**：`buildLookupCandidates` 给出有序变体，逐个查、命中即停。
+ * 顺序有意义（精确优先于词形还原），所以不能并行发出去取第一个回来的。
+ */
+
+import { CODE, MSG, fail, ok } from '../core/protocol.js'
+import { buildLookupCandidates } from '../core/lookup-candidates.js'
+import { getSettings } from '../core/settings.js'
+import { createCache } from './cache.js'
+import * as client from './mydict-client.js'
+
+const cache = createCache()
+
+const queryKey = (base, word) => `query:${base}:${word}`
+const vocabKey = (base, word) => `vocab:${base}:${word}`
+
+/** 统一把异常收敛成 {ok:false, code, message}。 */
+function toFailure(error) {
+  if (error && typeof error.code === 'string') {
+    return fail(error.code, error.message)
+  }
+  return fail(CODE.ERROR, error?.message || String(error))
+}
+
+/**
+ * 查词：按候选顺序找到第一个有结果的词。
+ * 返回命中词 `hitWord`，面板 header 会在原文与命中词不同时显示归一化过程。
+ */
+async function handleQuery(settings, { word, lang } = {}) {
+  const candidates = buildLookupCandidates(word, lang)
+  if (candidates.length === 0) {
+    return fail(CODE.EMPTY, '这不是一个可查询的词')
+  }
+
+  const base = settings?.baseUrl || ''
+  for (const candidate of candidates) {
+    const key = queryKey(base, candidate)
+    let results = cache.get(key)
+    if (results === undefined) {
+      const payload = await client.query(settings, candidate)
+      results = payload?.results || []
+      cache.set(key, results)
+    }
+    if (results.length > 0) {
+      return ok({ results, hitWord: candidate, candidates })
+    }
+  }
+  return fail(CODE.EMPTY, '没有词典收录这个词')
+}
+
+async function handleVocabList(settings, { word } = {}) {
+  const base = settings?.baseUrl || ''
+  const key = vocabKey(base, word)
+  const cached = cache.get(key)
+  if (cached !== undefined) return ok(cached)
+
+  const data = await client.vocabList(settings, word)
+  cache.set(key, data, 30 * 1000)
+  return ok(data)
+}
+
+async function handleVocabAdd(settings, { word, dictionaryId } = {}) {
+  const data = await client.vocabAdd(settings, word, dictionaryId)
+  // 变更后立刻失效，避免面板里再打开还是旧状态
+  cache.deleteByPrefix(`vocab:${settings?.baseUrl || ''}:`)
+  return ok(data)
+}
+
+async function handleVocabRemove(settings, { itemId } = {}) {
+  const data = await client.vocabRemove(settings, itemId)
+  cache.deleteByPrefix(`vocab:${settings?.baseUrl || ''}:`)
+  return ok(data)
+}
+
+/**
+ * 消息入口。所有 handler 都是「拿最新设置 → 干活 → 收敛错误」的同一形状。
+ * 返回值一定是 {ok:true,...} 或 {ok:false,...}，绝不抛出去（抛出去 content 只能看到
+ * 一个没有信息量的 "message port closed"）。
+ */
+export async function route(message) {
+  const type = message?.type
+  try {
+    // 这条不需要设置，也不用读 storage，先处理掉
+    if (type === MSG.OPEN_OPTIONS) {
+      chrome.runtime.openOptionsPage()
+      return ok({})
+    }
+
+    const settings = await getSettings()
+    const payload = message?.payload || {}
+
+    switch (type) {
+      case MSG.QUERY:
+        return await handleQuery(settings, payload)
+      case MSG.VOCAB_LIST:
+        return await handleVocabList(settings, payload)
+      case MSG.VOCAB_ADD:
+        return await handleVocabAdd(settings, payload)
+      case MSG.VOCAB_REMOVE:
+        return await handleVocabRemove(settings, payload)
+      case MSG.TEST_CONNECTION:
+        return ok(await client.testConnection(settings))
+      default:
+        return fail(CODE.ERROR, `未知消息类型：${type}`)
+    }
+  } catch (error) {
+    return toFailure(error)
+  }
+}
+
+/** 地址/Token 变了就清缓存（由 background.js 的 storage 监听调用）。 */
+export function resetCache() {
+  cache.clear()
+}

@@ -1,0 +1,218 @@
+/* 设置页样式。只吃系统深色模式，不引入任何依赖。 */
+
+:root {
+  color-scheme: light dark;
+
+  --bg: #f6f8f7;
+  --surface: #ffffff;
+  --border: #e2e7e4;
+  --text: #16211c;
+  --text-muted: #5b6b65;
+  --brand: #2f6f5e;
+  --brand-text: #ffffff;
+  --danger: #c0392b;
+  --ok: #2f8f5e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12161a;
+    --surface: #1b2126;
+    --border: #2c363d;
+    --text: #eaf1ee;
+    --text-muted: #9db0aa;
+    --brand: #4aa88c;
+    --brand-text: #0d1114;
+    --danger: #f1726f;
+    --ok: #3fd8a3;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 32px 20px 64px;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.6 -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei',
+    'Segoe UI', sans-serif;
+}
+
+main {
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.page-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.page-head h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.page-head p {
+  margin: 2px 0 0;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.card h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-weight: 500;
+}
+
+input[type='url'],
+input[type='password'],
+textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+
+input[type='url']:focus,
+input[type='password']:focus,
+textarea:focus {
+  outline: 2px solid var(--brand);
+  outline-offset: -1px;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.hint {
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.hint code {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 3px;
+}
+
+.radio,
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.radio span,
+.check span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.radio input,
+.check input {
+  margin-top: 3px;
+  flex-shrink: 0;
+  accent-color: var(--brand);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: sticky;
+  bottom: 0;
+  padding: 12px 0;
+  background: linear-gradient(to top, var(--bg) 60%, transparent);
+}
+
+button {
+  font: inherit;
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+button.primary {
+  background: var(--brand);
+  color: var(--brand-text);
+  font-weight: 600;
+}
+
+button.secondary {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+.status {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.status.ok {
+  color: var(--ok);
+}
+
+.status.error {
+  color: var(--danger);
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.small {
+  font-size: 12.5px;
+}
+
+output {
+  font-variant-numeric: tabular-nums;
+}

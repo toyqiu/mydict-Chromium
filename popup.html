@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>MyReader 划词查词</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <!-- 扩展工具栏图标的弹窗：一个搜索框 + 查词结果。
+         chrome:// 新标签页这类注入不了脚本的页面也能用，所以工具栏入口走这里
+         而不是往页面里塞面板。 -->
+    <div id="host"></div>
+    <script src="popup-boot.js"></script>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

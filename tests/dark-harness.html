@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>popup 暗色渲染 harness</title>
+  <style>
+    body { font: 14px/1.6 sans-serif; max-width: 640px; margin: 24px auto; }
+    #host { width: 460px; }
+    .btns { margin: 12px 0; display: flex; gap: 8px; }
+  </style>
+</head>
+<body>
+  <p>这个页面用与 popup.js 完全相同的 PANEL_CSS + .panel 结构渲染，用于验证主题切换与滚动结构。</p>
+  <div class="btns">
+    <button id="light">浅色</button>
+    <button id="dark">深色</button>
+  </div>
+  <div id="host"></div>
+  <script type="module">
+    import { PANEL_CSS, DICT_CHROME_CSS } from '/render/styles.js'
+
+    const host = document.getElementById('host')
+    const shadow = host.attachShadow({ mode: 'open' })
+    const style = document.createElement('style')
+    style.textContent = PANEL_CSS + DICT_CHROME_CSS + `
+      :host { display: block; width: 460px; }
+      .panel { max-height: 580px; }
+      .head .search { flex: 1; }
+      .head .go {
+        flex: none; border: 0; border-radius: 6px;
+        background: var(--p-accent); color: #fff; font: inherit;
+        font-size: 13px; padding: 4px 10px; cursor: pointer;
+      }
+    `
+    shadow.appendChild(style)
+
+    const panel = document.createElement('div')
+    panel.className = 'panel'
+
+    const head = document.createElement('div')
+    head.className = 'head'
+    const input = document.createElement('input')
+    input.className = 'search'
+    input.value = 'run'
+    input.placeholder = '输入要查的词，回车'
+    const go = document.createElement('button')
+    go.className = 'go'
+    go.textContent = '查询'
+    head.append(input, go)
+
+    const body = document.createElement('div')
+    body.className = 'body'
+    // 灌一段足够长的占位内容，验证 .body 的滚动
+    for (let i = 1; i <= 40; i++) {
+      const p = document.createElement('p')
+      p.textContent = `第 ${i} 行占位内容——弹窗面板滚动验证。`
+      body.appendChild(p)
+    }
+    panel.append(head, body)
+    shadow.appendChild(panel)
+
+    const setTheme = (t) => host.setAttribute('data-theme', t)
+    document.getElementById('light').onclick = () => setTheme('light')
+    document.getElementById('dark').onclick = () => setTheme('dark')
+    setTheme('light')
+  </script>
+</body>
+</html>
