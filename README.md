@@ -126,6 +126,26 @@ MDict 转制的牛津高阶词条里，「拓展图」是成对结构——缩�
 
 ---
 
+## Firefox 版（XPI）
+
+同一套代码的 Gecko（Manifest V3）移植版，Release 资产里的
+`MyDict-Chromium-<版本>-fx.xpi`。
+
+- **临时安装**：`about:debugging` → 此 Firefox → 「临时载入附加组件」→ 选 XPI（重启失效）
+- **永久安装**：Firefox Release 强制签名；Developer Edition / Nightly 里将
+  `xpinstall.signatures.required` 设为 `false` 后可永久加载
+
+Firefox 专属注意：
+
+1. **站点授权**：Firefox MV3 的 host 权限是可选的。安装后到
+   `about:addons` → MyReader 划词查词 → 权限，允许访问站点；否则 background
+   跨域请求与 content script 都不会生效（面板会显示「连不上 MyDict」）。
+2. **MyDict 地址请用 HTTPS 入口**：扩展页面是安全上下文，HTTP 地址的请求会被
+   Firefox 按 mixed content 拦截（Chromium 版无此限制，局域网 HTTP 地址可用）。
+3. background 使用事件页（event page）而非 service worker，manifest 做了双端适配。
+
+---
+
 ## 目录结构
 
 ```
