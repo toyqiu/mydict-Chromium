@@ -22,7 +22,11 @@ const MESSAGES = {
 
 function describe(result) {
   if (result?.ok) return null
-  return MESSAGES[result?.code] || result?.message || '出错了'
+  const base = MESSAGES[result?.code] || result?.message || '出错了'
+  // 码翻译之外附上底层细节（如 NetworkError 的原始文案），方便定位
+  const detail = result?.message
+  if (detail && detail !== base && !base.includes(detail)) return `${base}（${detail}）`
+  return base
 }
 
 function setStatus(el, text, kind) {
@@ -71,6 +75,31 @@ function readForm() {
 
 // ------------------------------------------------------------------ 动作
 
+/**
+ * host 权限授权。Firefox MV3 的 host_permissions 是可选的，必须经 request（用户
+ * 手势）授予，否则 background 跨域 fetch 与 content script 都不生效；Chrome 里
+ * 已由 host_permissions 安装即授予，request 静默通过。地址留空（纯清空配置）时跳过。
+ *
+ * 「测试连接」也走这里：只点测试不点保存时同样需要权限，否则 Firefox 上 fetch 会
+ * 抛 NetworkError，被误报成「连不上服务器」。
+ */
+async function ensureOriginPermission(base, status) {
+  if (!base) return true
+  try {
+    const granted = await chrome.permissions.request({
+      origins: [originPattern(base)],
+    })
+    if (!granted) {
+      setStatus(status, '需要授权访问该服务器才能查词', 'error')
+      return false
+    }
+  } catch (error) {
+    setStatus(status, `授权失败：${error?.message || error}`, 'error')
+    return false
+  }
+  return true
+}
+
 async function onSave() {
   const patch = readForm()
   const status = $('saveStatus')
@@ -80,23 +109,7 @@ async function onSave() {
     return
   }
 
-  // host 站点授权：Firefox MV3 的 host_permissions 是可选的，必须经 request（用户
-  // 手势）授予，否则 background 跨域 fetch 与 content script 都不生效；Chrome 里
-  // 已由 host_permissions 安装即授予，request 静默通过。地址留空（纯清空配置）时跳过。
-  if (patch.baseUrl) {
-    try {
-      const granted = await chrome.permissions.request({
-        origins: [originPattern(patch.baseUrl)],
-      })
-      if (!granted) {
-        setStatus(status, '需要授权访问该服务器才能查词', 'error')
-        return
-      }
-    } catch (error) {
-      setStatus(status, `授权失败：${error?.message || error}`, 'error')
-      return
-    }
-  }
+  if (!(await ensureOriginPermission(patch.baseUrl, status))) return
 
   await setSettings(patch)
   setStatus(status, '已保存', 'ok')
@@ -110,7 +123,17 @@ async function onTest() {
   setStatus(status, '正在测试…')
 
   // 测试用的凭据取表单值而不是已保存值，方便「改了先测再保存」
-  await setSettings(readForm())
+  const patch = readForm()
+  if (patch.baseUrl && !isValidBase(patch.baseUrl)) {
+    setStatus(status, '地址不是合法的 http(s) URL', 'error')
+    button.disabled = false
+    return
+  }
+  if (!(await ensureOriginPermission(patch.baseUrl, status))) {
+    button.disabled = false
+    return
+  }
+  await setSettings(patch)
   const result = await chrome.runtime.sendMessage({ type: MSG.TEST_CONNECTION })
 
   if (result?.ok) {

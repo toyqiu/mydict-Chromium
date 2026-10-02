@@ -18,6 +18,7 @@ import {
   buildVocabListUrl,
   buildVocabUrl,
   normalizeBase,
+  originPattern,
 } from '../core/mydict-url.js'
 
 /** 带 code 的错误，router 直接取 code 回给 content。 */
@@ -33,6 +34,20 @@ async function ensureReady(settings) {
   const base = normalizeBase(settings?.baseUrl)
   if (!base) {
     throw new MydictError(CODE.NOT_CONFIGURED, '还没配置 MyDict 地址')
+  }
+  // Firefox MV3 的 host 权限是可选的，没授权时 fetch 会直接抛 NetworkError，
+  // 被归成「连不上服务器」，用户会白查半天网络。这里先查一次，报成可行动的
+  // PERMISSION_MISSING；Chrome 里 host_permissions 安装即授予，contains 恒真。
+  if (chrome.permissions?.contains) {
+    const granted = await chrome.permissions.contains({
+      origins: [originPattern(base)],
+    })
+    if (!granted) {
+      throw new MydictError(
+        CODE.PERMISSION_MISSING,
+        `还没授权访问 ${new URL(base).origin}，到设置页点「保存」授权一次`,
+      )
+    }
   }
   // token 允许为空：mydict 可以开匿名查询。但生词本一定要 token，由服务端 401 兜住。
   return { base, token: (settings?.token || '').trim() }
