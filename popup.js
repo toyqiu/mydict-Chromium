@@ -118,6 +118,11 @@ const STATE_COPY = {
   [CODE.NETWORK]: { title: '连不上 MyDict', detail: '检查地址、端口和网络连通性。', setup: true },
   [CODE.TIMEOUT]: { title: '查询超时', detail: '服务器响应太慢，稍后再试。' },
   [CODE.SERVER]: { title: 'MyDict 出错了', detail: '看下服务端日志。' },
+  [CODE.UNSUPPORTED]: {
+    title: '在线词典未开启',
+    detail: 'MyDict 管理后台 → 系统设置 → 在线词典，开启后重试。',
+    setup: true,
+  },
   [CODE.ERROR]: { title: '查询失败', detail: '' },
 }
 
