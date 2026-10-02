@@ -347,9 +347,9 @@ export function renderResults(results, container, options) {
           const fail = document.createElement('div')
           fail.className = 'mydict-translate-error'
           let message = result?.message || '在线词典查询失败'
-          // Token 失效是这个标签最常见的失败（匿名也能查，失效 Token 反而 401），给可行动的提示
+          // 剩余到达这里的鉴权失败（匿名也被拒）：服务端没开「开放使用」且无网页登录态
           if (result?.code === 'AUTH') {
-            message = `Token 无效或已过期：${message}。可到设置里更新 Token，或清空 Token 后重试。`
+            message = `在线词典鉴权失败：${message}`
           }
           fail.textContent = message
           output.appendChild(fail)

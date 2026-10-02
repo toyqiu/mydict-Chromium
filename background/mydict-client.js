@@ -116,22 +116,34 @@ export async function query(settings, word) {
  * 在线词典聚合（Wikipedia / Wiktionary / 百度百科 + 外部搜索链接）。
  *
  * 与 /api/v1/query 一样无 CORS 头，只能在 background 发。服务端有自己的限流与
- * 600s 缓存。错误语义要分清：
+ * 600s 缓存。错误语义与鉴权要分清（真机踩过的三层坑）：
  *   - 403 = 功能未开启（online_dict_enabled）→ UNSUPPORTED「未开启」
- *   - 401 = Token 无效/过期 → 原样报 AUTH（真实原因：服务端返回「登录凭证无效或已过期」）。
- *     实测匿名 200、带失效 token 401——把 401 也报成「未开启」会把用户引去查开关，
- *     实际该更新 Token（真机踩过）。
+ *   - 401 且带了 Token → **该端点校验的是网页会话 JWT，不认 sk- API Token**，
+ *     带 sk- Token 必然 401。降级为匿名重试一次（服务端开启「开放使用」时匿名可用）。
+ *   - 匿名仍 401 = 服务端没开「开放使用」，扩展侧无法使用 → UNSUPPORTED 说明。
  */
 export async function onlineLookup(settings, { word, lang }) {
   const { base, token } = await ensureReady(settings)
+  const url = buildOnlineLookupUrl(base, word, lang)
   try {
-    return await requestJson(buildOnlineLookupUrl(base, word, lang), {
-      token,
-      timeoutMs: QUERY_TIMEOUT_MS,
-    })
+    return await requestJson(url, { token, timeoutMs: QUERY_TIMEOUT_MS })
   } catch (error) {
     if (error instanceof MydictError && error.status === 403) {
       throw new MydictError(CODE.UNSUPPORTED, '在线词典未开启（MyDict 管理后台 → 系统设置）', 403)
+    }
+    if (error instanceof MydictError && error.status === 401 && token) {
+      try {
+        return await requestJson(url, { token: '', timeoutMs: QUERY_TIMEOUT_MS })
+      } catch (retryError) {
+        if (retryError instanceof MydictError && retryError.status === 401) {
+          throw new MydictError(
+            CODE.UNSUPPORTED,
+            '在线词典需要网页登录或服务端开启「开放使用」，当前配置无法使用',
+            401,
+          )
+        }
+        throw retryError
+      }
     }
     throw error
   }
