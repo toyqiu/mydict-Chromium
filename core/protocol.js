@@ -11,6 +11,11 @@
 export const MSG = {
   /** {word, lang?} -> {results, hitWord, candidates} 按候选词依次查，命中即停 */
   QUERY: 'QUERY',
+  /**
+   * {word, lang} -> {word, lang, sections, links} 在线词典聚合（Wikipedia/Wiktionary/百度百科）。
+   * 无 CORS 头，必须 background 发；服务端总开关关着时返回 UNSUPPORTED。
+   */
+  ONLINE_LOOKUP: 'ONLINE_LOOKUP',
   /** {word} -> {saved: {[dictionaryId]: itemId}} 该词在生词本里的记录 */
   VOCAB_LIST: 'VOCAB_LIST',
   /** {word, dictionaryId} -> {itemId} 409 时返回 DUPLICATE */
@@ -25,6 +30,12 @@ export const MSG = {
   OPEN_OPTIONS: 'OPEN_OPTIONS',
   /** popup → content：探针，确认当前页面的 content script 是否注入。 */
   PING: 'PING',
+  /**
+   * content/popup → background：翻译兜底通道。content script 直连 edge 端点被页面
+   * CSP 拦掉时才走这里（background 的 fetch 不受页面 CSP 约束）。
+   * {texts: string[], from?, to?} -> string[]
+   */
+  TRANSLATE: 'TRANSLATE',
 }
 
 export const CODE = {

@@ -9,6 +9,7 @@
 
 import { MSG } from '../core/protocol.js'
 import { getSettings, isBlocked, onSettingsChanged } from '../core/settings.js'
+import { isTranslateCandidate } from '../core/translator.js'
 import { createPanel } from './panel.js'
 import { createTriggerIcon } from './trigger-icon.js'
 import { createVocabCapability } from './vocab.js'
@@ -59,6 +60,9 @@ export function start() {
   /**
    * 开面板。`rectOverride` 可选——调用方刚合成/刚拿到选区时把矩形直接递进来，
    * 免得再去读一次；没有就现场读当前选区。
+   *
+   * 线路自动判定：像句子（全非字母≥6字 / 英文≥3词）→ 面板直接落在「翻译」标签，
+   * 否则照旧查词典——面板里随时可以用标签或 ←/→ 切到另一边。
    */
   function openPanelForSelection(rectOverride) {
     const selection = readSelection()
@@ -67,7 +71,9 @@ export function start() {
     icon.hide()
     const rect = rectOverride ?? selection.rect
     lastOpenRect = rect
-    panel.open(selection.text, rect, settings)
+    panel.open(selection.text, rect, settings, {
+      translate: isTranslateCandidate(selection.text),
+    })
   }
 
   function anchorMoved(rect) {
@@ -112,9 +118,9 @@ export function start() {
       return
     }
 
-    // icon 模式
+    // icon 模式：浮标形态随线路走——像句子显示「译」，像词显示「词」
     iconAnchor = selection.rect
-    icon.show(selection.rect)
+    icon.show(selection.rect, isTranslateCandidate(selection.text) ? 'translate' : 'word')
   }
 
   let selectionTimer = 0

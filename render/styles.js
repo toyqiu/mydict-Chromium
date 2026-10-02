@@ -116,6 +116,98 @@ export const DICT_CHROME_CSS = `
   summary.mydict-group-head:hover { color: color-mix(in srgb, currentColor 75%, transparent); }
   summary.mydict-group-head:hover .mydict-group-chevron { opacity: 0.8; }
   .mydict-group-name { font-weight: 600; }
+  /* ---- 划词翻译标签页（render/renderer.js 的 translateBlock） ---- */
+  .mydict-translate { padding: 0.4em 0.2em; }
+  .mydict-translate-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    font-size: 0.82em;
+    opacity: 0.85;
+    margin-bottom: 0.5em;
+  }
+  .mydict-translate-lang {
+    font: inherit;
+    font-size: inherit;
+    color: inherit;
+    background: color-mix(in srgb, currentColor 8%, transparent);
+    border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+    border-radius: 6px;
+    padding: 0.1em 0.4em;
+  }
+  .mydict-translate-original {
+    font-size: 0.85em;
+    opacity: 0.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+    padding-bottom: 0.5em;
+    margin-bottom: 0.5em;
+    border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+  }
+  .mydict-translate-output {
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.55;
+    font-size: 1.02em;
+  }
+  .mydict-translate-loading { display: flex; align-items: center; gap: 8px; opacity: 0.75; }
+  .mydict-translate-error {
+    color: color-mix(in srgb, currentColor 60%, #d64545);
+    margin-bottom: 0.4em;
+  }
+  /* ---- 在线词典标签页（render/renderer.js 的 onlineBlock） ---- */
+  .mydict-online { padding: 0.4em 0.2em; }
+  .mydict-online-card {
+    border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+    border-radius: 8px;
+    padding: 0.5em 0.7em;
+    margin-bottom: 0.6em;
+  }
+  .mydict-online-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin-bottom: 0.3em;
+  }
+  .mydict-online-name {
+    font-weight: 600;
+    font-size: 0.85em;
+    opacity: 0.85;
+  }
+  .mydict-online-open,
+  .mydict-online-ext {
+    all: unset;
+    cursor: pointer;
+    font-size: 0.78em;
+    color: color-mix(in srgb, currentColor 70%, #4a9d8e);
+    padding: 1px 6px;
+    border-radius: 6px;
+    border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  }
+  .mydict-online-open:hover,
+  .mydict-online-ext:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+  .mydict-online-title { font-weight: 600; margin-bottom: 0.2em; }
+  .mydict-online-subtitle { font-size: 0.85em; opacity: 0.7; margin-bottom: 0.3em; }
+  .mydict-online-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.55;
+    font-size: 0.95em;
+  }
+  .mydict-online-pos { font-weight: 600; font-size: 0.85em; margin: 0.4em 0 0.2em; opacity: 0.8; }
+  .mydict-online-senses { margin: 0; padding-left: 1.2em; line-height: 1.5; font-size: 0.95em; }
+  .mydict-online-example { font-size: 0.88em; opacity: 0.7; font-style: italic; margin-top: 0.1em; }
+  .mydict-online-links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4em;
+    margin-top: 0.2em;
+    font-size: 0.82em;
+    opacity: 0.9;
+  }
+  .mydict-online-label { opacity: 0.7; }
   /* 生词本星标：每个词典分组一个，状态以服务端为准（★ 已收藏 / ☆ 未收藏） */
   .mydict-vocab-star {
     flex: none;

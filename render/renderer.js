@@ -19,14 +19,128 @@ import { wireLinks } from './links.js'
 import { wireDictAudio } from './audio.js'
 import { wireImageInteractions } from './expandable.js'
 import { adaptToDarkTheme } from './dark-theme.js'
+import { translateText, TRANSLATOR_LANGS, effectiveTargetLang } from '../core/translator.js'
+
+/** 翻译标签页的伪语言值（不与真实语言桶冲突）。 */
+export const TRANSLATE_TAB = '__translate__'
+/** 词典空结果时的「词典」伪标签：让词典线路在翻译视图里保持可达。 */
+export const DICT_TAB = '__dict__'
+/** 在线词典标签页（Wikipedia / Wiktionary / 百度百科，服务端聚合）。 */
+export const ONLINE_TAB = '__online__'
 
 /**
  * @param {Array} results 服务端返回的 `results`
  * @param {HTMLElement} container 面板 shadow 里的内容容器（每次渲染前会被清空）
  * @param {object} options
  */
+/** 在线词典模块级缓存（key = `${lang}:${text}`）。服务端还有一层 600s TTL 缓存。 */
+const onlineCache = new Map()
+
+/** 渲染在线词典返回的 sections + links（服务端已纯文本化，全部 textContent 注入）。 */
+function renderOnlinePayload(container, payload, openExternal) {
+  const sections = payload?.sections || []
+  if (sections.length === 0 && !(payload?.links || []).length) {
+    const empty = document.createElement('div')
+    empty.className = 'mydict-translate-error'
+    empty.textContent = '在线词典没有返回内容'
+    container.appendChild(empty)
+    return
+  }
+  for (const section of sections) {
+    const card = document.createElement('div')
+    card.className = 'mydict-online-card'
+
+    const head = document.createElement('div')
+    head.className = 'mydict-online-head'
+    const name = document.createElement('span')
+    name.className = 'mydict-online-name'
+    name.textContent = section.name || section.id || ''
+    head.appendChild(name)
+    if (section.url) {
+      const open = document.createElement('button')
+      open.type = 'button'
+      open.className = 'mydict-online-open'
+      open.textContent = '在新标签页打开 ↗'
+      open.title = section.url
+      open.addEventListener('click', () => openExternal?.(section.url))
+      head.appendChild(open)
+    }
+    card.appendChild(head)
+
+    if (section.title) {
+      const title = document.createElement('div')
+      title.className = 'mydict-online-title'
+      title.textContent = section.title
+      card.appendChild(title)
+    }
+    if (section.subtitle) {
+      const subtitle = document.createElement('div')
+      subtitle.className = 'mydict-online-subtitle'
+      subtitle.textContent = section.subtitle
+      card.appendChild(subtitle)
+    }
+    if (section.text) {
+      const text = document.createElement('div')
+      text.className = 'mydict-online-text'
+      text.textContent = section.text
+      card.appendChild(text)
+    }
+    for (const entry of section.entries || []) {
+      const pos = document.createElement('div')
+      pos.className = 'mydict-online-pos'
+      pos.textContent = [entry.pos, entry.language].filter(Boolean).join(' · ')
+      card.appendChild(pos)
+      const senses = document.createElement('ul')
+      senses.className = 'mydict-online-senses'
+      for (const sense of entry.senses || []) {
+        const li = document.createElement('li')
+        li.textContent = sense.text || ''
+        for (const example of sense.examples || []) {
+          const ex = document.createElement('div')
+          ex.className = 'mydict-online-example'
+          ex.textContent = example
+          li.appendChild(ex)
+        }
+        senses.appendChild(li)
+      }
+      card.appendChild(senses)
+    }
+    container.appendChild(card)
+  }
+
+  const links = payload?.links || []
+  if (links.length > 0) {
+    const row = document.createElement('div')
+    row.className = 'mydict-online-links'
+    const label = document.createElement('span')
+    label.className = 'mydict-online-label'
+    label.textContent = '外部打开：'
+    row.appendChild(label)
+    for (const link of links) {
+      const btn = document.createElement('button')
+      btn.type = 'button'
+      btn.className = 'mydict-online-ext'
+      btn.textContent = link.name || link.id
+      btn.title = link.url
+      btn.addEventListener('click', () => openExternal?.(link.url))
+      row.appendChild(btn)
+    }
+    container.appendChild(row)
+  }
+}
+
 export function renderResults(results, container, options) {
-  const { baseUrl, lang, vocab, onNavigate, onNotify, isDarkMode, audioEnabled } = options
+  const {
+    baseUrl,
+    lang,
+    vocab,
+    onNavigate,
+    onNotify,
+    isDarkMode,
+    audioEnabled,
+    translate,
+    online,
+  } = options
   container.textContent = ''
 
   // 服务端已按词典排序，所以「折叠连续同名」就保住了顺序，不需要额外的索引表
@@ -46,7 +160,12 @@ export function renderResults(results, container, options) {
   // 默认选中与页面语言命中一致的那一组：日文网页上查汉字，日文词典排在前面才对。
   // 页面语言没有命中就回到「全部」。
   const pageLang = langBucket(lang)
-  let activeLang = langOrder.includes(pageLang) ? pageLang : ''
+  // 「译」图标/搜索框判定进来的直接落在翻译标签上；否则回默认词典组
+  let activeLang = translate?.active
+    ? TRANSLATE_TAB
+    : langOrder.includes(pageLang)
+      ? pageLang
+      : ''
 
   // 同一次渲染里，同一个词头的已收藏状态只查一次
   const savedByWord = new Map()
@@ -67,11 +186,16 @@ export function renderResults(results, container, options) {
       scope.details.style.display = visible ? '' : 'none'
       if (selected !== '' && scope.lang !== selected) scope.details.open = false
     }
+    if (translateBlock) translateBlock.style.display = selected === TRANSLATE_TAB ? '' : 'none'
+    if (dictEmptyBlock) dictEmptyBlock.style.display = selected === DICT_TAB ? '' : 'none'
+    if (onlineBlock) onlineBlock.style.display = selected === ONLINE_TAB ? '' : 'none'
   }
 
-  // 语言标签页：只有两种以上语言时才值得占一行
+  // 语言标签页：多语言、或带翻译/词典空标签时才值得占一行。
+  // 注意 translate 模式下**只有一个语言桶也要造标签**——否则词典分组渲染了却不可达，
+  // 表象就是「默认落在翻译标签后切不回词典」（真机踩过）。
   const tabButtons = []
-  if (langOrder.length > 1) {
+  if (langOrder.length > 1 || translate) {
     const tabs = document.createElement('div')
     tabs.className = 'mydict-lang-tabs'
     tabs.addEventListener('click', (event) => event.stopPropagation())
@@ -84,9 +208,160 @@ export function renderResults(results, container, options) {
       tabButtons.push({ value, tab })
       return tab
     }
-    tabs.appendChild(makeTab('', '全部'))
-    for (const bucket of langOrder) tabs.appendChild(makeTab(bucket, LANG_TAB_NAMES[bucket] ?? bucket))
+    if (langOrder.length >= 1) {
+      if (langOrder.length > 1) tabs.appendChild(makeTab('', '全部'))
+      for (const bucket of langOrder) tabs.appendChild(makeTab(bucket, LANG_TAB_NAMES[bucket] ?? bucket))
+    }
+    // 词典查过且为空：给一个「词典」标签，点过去看「没有收录」的说明，词典线路不失联
+    const dictEmpty = Boolean(translate?.dictEmptyText) && langOrder.length === 0
+    if (dictEmpty) tabs.appendChild(makeTab(DICT_TAB, '词典'))
+    // 「在线」= 服务端聚合的 Wikipedia / Wiktionary / 百度百科；「翻译」保持最右
+    if (online) tabs.appendChild(makeTab(ONLINE_TAB, '在线'))
+    if (translate) tabs.appendChild(makeTab(TRANSLATE_TAB, '翻译'))
     container.appendChild(tabs)
+  }
+
+  // 「词典」空结果说明块（只在词典伪标签激活时可见）
+  const dictEmptyBlock = translate?.dictEmptyText && langOrder.length === 0 ? document.createElement('div') : null
+  if (dictEmptyBlock) {
+    dictEmptyBlock.className = 'state'
+    dictEmptyBlock.style.display = activeLang === DICT_TAB ? '' : 'none'
+    const title = document.createElement('div')
+    title.className = 'title'
+    title.textContent = '没有词典收录'
+    const detail = document.createElement('div')
+    detail.className = 'detail'
+    detail.textContent = translate.dictEmptyText
+    dictEmptyBlock.append(title, detail)
+    container.appendChild(dictEmptyBlock)
+  }
+
+  // ---------------------------------------------------------- 翻译标签页的内容
+
+  const translateBlock = translate ? document.createElement('div') : null
+  if (translateBlock) {
+    translateBlock.className = 'mydict-translate'
+    translateBlock.style.display = activeLang === TRANSLATE_TAB ? '' : 'none'
+
+    const controls = document.createElement('div')
+    controls.className = 'mydict-translate-controls'
+    const label = document.createElement('span')
+    label.className = 'mydict-translate-label'
+    label.textContent = '译成'
+    const langSelect = document.createElement('select')
+    langSelect.className = 'mydict-translate-lang'
+    for (const { value, label: name } of TRANSLATOR_LANGS) {
+      const option = document.createElement('option')
+      option.value = value
+      option.textContent = name
+      langSelect.appendChild(option)
+    }
+    // 初值 = 按选区语言自动纠偏后的目标语言；用户手动改了就以手动的为准
+    langSelect.value = effectiveTargetLang(translate.text, translate.targetLang)
+    controls.append(label, langSelect)
+    translateBlock.appendChild(controls)
+
+    const original = document.createElement('div')
+    original.className = 'mydict-translate-original'
+    original.textContent = translate.text
+    translateBlock.appendChild(original)
+
+    const output = document.createElement('div')
+    output.className = 'mydict-translate-output'
+    translateBlock.appendChild(output)
+    container.appendChild(translateBlock)
+
+    /** 请求令牌：换语言/重开面板后回来的旧响应直接丢弃。 */
+    let translateToken = 0
+    async function runTranslate() {
+      const token = ++translateToken
+      output.textContent = ''
+      const row = document.createElement('div')
+      row.className = 'mydict-translate-loading'
+      const spinner = document.createElement('span')
+      spinner.className = 'spinner'
+      row.append(spinner, document.createTextNode('正在翻译…'))
+      output.appendChild(row)
+      try {
+        const translated = await translateText(translate.text, {
+          targetLang: langSelect.value,
+          from: '',
+          // 下拉框是用户显式选择，不再做「与源语言同桶纠偏」
+          exact: true,
+          sendBackground: options.sendBackground,
+        })
+        if (token !== translateToken) return
+        output.textContent = translated || '（译文为空）'
+      } catch (error) {
+        if (token !== translateToken) return
+        output.textContent = ''
+        const fail = document.createElement('div')
+        fail.className = 'mydict-translate-error'
+        fail.textContent = `翻译失败：${error?.message || error}`
+        const retry = document.createElement('button')
+        retry.type = 'button'
+        retry.textContent = '重试'
+        retry.addEventListener('click', () => void runTranslate())
+        output.append(fail, retry)
+      }
+    }
+
+    langSelect.addEventListener('change', () => void runTranslate())
+    // 首次切到翻译标签（或以翻译标签开场）时才真正发请求——词典结果在大多数情况下用不上译文
+    if (activeLang === TRANSLATE_TAB) {
+      translateBlock.loaded = true
+      void runTranslate()
+    }
+    translateBlock.load = runTranslate
+    translateBlock.visible = () => translateBlock.style.display !== 'none'
+  }
+
+  // ---------------------------------------------------------- 在线词典标签页
+
+  const onlineBlock = online ? document.createElement('div') : null
+  if (onlineBlock) {
+    onlineBlock.className = 'mydict-online'
+    onlineBlock.style.display = activeLang === ONLINE_TAB ? '' : 'none'
+    const output = document.createElement('div')
+    onlineBlock.appendChild(output)
+    container.appendChild(onlineBlock)
+
+    let onlineToken = 0
+    async function runOnlineLookup() {
+      const token = ++onlineToken
+      output.textContent = ''
+      const row = document.createElement('div')
+      row.className = 'mydict-translate-loading'
+      const spinner = document.createElement('span')
+      spinner.className = 'spinner'
+      row.append(spinner, document.createTextNode('正在查询在线词典…'))
+      output.appendChild(row)
+
+      const key = `${online.lang}:${online.text}`
+      let payload = onlineCache.get(key)
+      if (!payload) {
+        const result = await online.lookup(online.text, online.lang)
+        if (token !== onlineToken) return
+        if (!result?.ok) {
+          output.textContent = ''
+          const fail = document.createElement('div')
+          fail.className = 'mydict-translate-error'
+          fail.textContent = result?.message || '在线词典查询失败'
+          output.appendChild(fail)
+          return
+        }
+        payload = result.data
+        onlineCache.set(key, payload)
+      }
+      if (token !== onlineToken) return
+      output.textContent = ''
+      renderOnlinePayload(output, payload, online.openExternal)
+    }
+    if (activeLang === ONLINE_TAB) {
+      onlineBlock.loaded = true
+      void runOnlineLookup()
+    }
+    onlineBlock.load = runOnlineLookup
   }
 
   for (const group of groups) {
@@ -253,6 +528,23 @@ export function renderResults(results, container, options) {
       tab.classList.toggle('mydict-lang-tab-active', v === value)
     }
     applyLangFilter(value)
+    if (translateBlock && value === TRANSLATE_TAB) {
+      // 翻译请求懒加载：第一次切到这个标签才发（开场即翻译标签的场景已在创建时发过）
+      if (!translateBlock.loaded) {
+        translateBlock.loaded = true
+        void translateBlock.load()
+      }
+      translateBlock.scrollIntoView({ block: 'nearest' })
+      return
+    }
+    if (onlineBlock && value === ONLINE_TAB) {
+      if (!onlineBlock.loaded) {
+        onlineBlock.loaded = true
+        void onlineBlock.load()
+      }
+      onlineBlock.scrollIntoView({ block: 'nearest' })
+      return
+    }
     const first = scopes.find((s) => s.details.style.display !== 'none')
     if (first) {
       first.details.open = true
@@ -276,12 +568,16 @@ export function renderResults(results, container, options) {
     visible[next].details.scrollIntoView({ block: 'nearest' })
   }
 
-  /** ←/→：切到上一个/下一个语言标签（循环），只有一种语言时无事可做。 */
+  /**
+   * ←/→：切到上一个/下一个标签（循环）。顺序 = 语言标签 → 「翻译」标签（在最右），
+   * 「全部」不参与循环（它只是点击用的重置位）；只有一种语言且无翻译标签时无事可做。
+   */
   function moveLang(delta) {
-    if (langOrder.length < 2) return
-    const current = langOrder.indexOf(activeLang)
-    const next = (current + delta + langOrder.length) % langOrder.length
-    selectLang(langOrder[next])
+    const navOrder = tabButtons.filter((t) => t.value !== '').map((t) => t.value)
+    if (navOrder.length < 2) return
+    const current = navOrder.indexOf(activeLang)
+    const next = (current + delta + navOrder.length) % navOrder.length
+    selectLang(navOrder[next])
   }
 
   return { moveGroup, moveLang }

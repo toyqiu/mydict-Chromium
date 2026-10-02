@@ -6,6 +6,7 @@
 import { CODE, MSG } from './core/protocol.js'
 import { DEFAULTS, getSettings, setSettings } from './core/settings.js'
 import { isValidBase, normalizeBase, originPattern } from './core/mydict-url.js'
+import { TRANSLATOR_LANGS } from './core/translator.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -47,7 +48,22 @@ function fillForm(settings) {
   $('panelWidth').value = settings.panelWidth
   $('fontScale').value = settings.fontScale
   $('enableAudio').checked = settings.enableAudio
+  fillTranslateLangs(settings.translateTargetLang)
   syncOutputs()
+}
+
+/** 翻译目标语言下拉：选项来自 core/translator.js 的语言表。 */
+function fillTranslateLangs(selected) {
+  const select = $('translateTargetLang')
+  select.textContent = ''
+  for (const { value, label } of TRANSLATOR_LANGS) {
+    const option = document.createElement('option')
+    option.value = value
+    option.textContent = label
+    select.appendChild(option)
+  }
+  select.value = selected ?? DEFAULTS.translateTargetLang
+  if (select.value !== selected) select.value = DEFAULTS.translateTargetLang // 兜底未知旧值
 }
 
 function syncOutputs() {
@@ -70,6 +86,7 @@ function readForm() {
     panelWidth: Number($('panelWidth').value),
     fontScale: Number($('fontScale').value),
     enableAudio: $('enableAudio').checked,
+    translateTargetLang: $('translateTargetLang').value,
   }
 }
 

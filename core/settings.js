@@ -28,6 +28,12 @@ export const DEFAULTS = {
   blocklist: [],
   /** 面板主题：auto 跟随系统 */
   theme: 'auto',
+
+  /**
+   * 划词翻译的目标语言（Edge 接口的语言码）。
+   * 与源语言同语种时 core/translator.js 会自动纠偏（比如选中中文而目标是中文 → 译成英文）。
+   */
+  translateTargetLang: 'zh-Hans',
 }
 
 /** 读全部设置（缺失项用默认值补齐）。 */

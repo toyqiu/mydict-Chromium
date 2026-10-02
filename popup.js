@@ -9,6 +9,7 @@
 import { CODE, MSG } from './core/protocol.js'
 import { getSettings } from './core/settings.js'
 import { isValidBase } from './core/mydict-url.js'
+import { guessSourceLang, isTranslateCandidate } from './core/translator.js'
 import { DICT_CHROME_CSS, PANEL_CSS } from './render/styles.js'
 import { renderResults } from './render/renderer.js'
 import { createVocabCapability } from './content/vocab.js'
@@ -55,7 +56,7 @@ backBtn.hidden = true
 const searchInput = document.createElement('input')
 searchInput.type = 'text'
 searchInput.className = 'search'
-searchInput.placeholder = '输入要查的词，回车'
+searchInput.placeholder = '查词或翻译：≥6个非字母字 / ≥3个英文单词走翻译，回车'
 searchInput.spellcheck = false
 const goBtn = document.createElement('button')
 goBtn.type = 'button'
@@ -120,7 +121,7 @@ const STATE_COPY = {
   [CODE.ERROR]: { title: '查询失败', detail: '' },
 }
 
-function renderState(copy) {
+function renderState(copy, { onTranslate } = {}) {
   clearContent()
   const state = document.createElement('div')
   state.className = 'state'
@@ -139,8 +140,20 @@ function renderState(copy) {
   const retry = document.createElement('button')
   retry.type = 'button'
   retry.textContent = '重试'
-  retry.addEventListener('click', () => void runLookup(history[history.length - 1], { keepHistory: true }))
+  retry.addEventListener('click', () => {
+    const previous = history[history.length - 1]
+    void runLookup(previous.text, { keepHistory: true, translate: previous.translate })
+  })
   actions.appendChild(retry)
+  // 词典不命中的出口：手动改走翻译线路（短词不自动切，避免「还没查就跑翻译」的观感）
+  if (onTranslate) {
+    const tr = document.createElement('button')
+    tr.type = 'button'
+    tr.textContent = '翻译'
+    tr.title = '改用 Edge 翻译这段文字'
+    tr.addEventListener('click', onTranslate)
+    actions.appendChild(tr)
+  }
   if (copy.setup) {
     const setup = document.createElement('button')
     setup.type = 'button'
@@ -168,55 +181,116 @@ function renderLoading(word) {
   content.appendChild(state)
 }
 
-async function runLookup(word, { keepHistory = false } = {}) {
+/** 历史栈条目：{ text, translate }——回退要还原「走的哪条线路」。 */
+async function runLookup(word, { keepHistory = false, translate = false } = {}) {
   const token = ++requestToken
-  if (!keepHistory) history.push(word)
+  if (!keepHistory) history.push({ text: word, translate })
   backBtn.hidden = history.length <= 1
   searchInput.value = word
-  renderLoading(word)
 
   const settings = await getSettings()
-  const result = await chrome.runtime.sendMessage({ type: MSG.QUERY, payload: { word } })
-  if (token !== requestToken) return
-
-  if (!result?.ok) {
-    const copy = STATE_COPY[result?.code] ?? STATE_COPY[CODE.ERROR]
-    renderState({ ...copy, detail: copy.detail || result?.message || '' })
-    return
-  }
-
-  const { results, hitWord } = result.data
-  searchInput.value = hitWord
   const dark =
     settings.theme === 'dark' ||
     (settings.theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)
   host.setAttribute('data-theme', dark ? 'dark' : 'light')
 
-  renderApi = renderResults(results, content, {
-    baseUrl: settings.baseUrl,
-    lang: navigator.language,
-    vocab,
-    onNavigate: (nextWord) => void runLookup(nextWord),
-    onNotify: notify,
-    isDarkMode: dark,
-    audioEnabled: settings.enableAudio,
-    // popup 是 460px 小窗，扫描图在弹窗内永远放不大——点大图开独立标签页承载灯箱，
-    // 那里才是真全屏（面板里点图仍然是就地遮罩）
-    openImages: (urls, index, alt) => {
-      const query = new URLSearchParams({
-        urls: JSON.stringify(urls),
-        index: String(index),
-        alt,
-      })
-      void chrome.tabs.create({ url: `lightbox.html?${query.toString()}` })
-    },
-  })
+    const renderWith = (results, translateActive, dictEmptyText) => {
+      renderApi = renderResults(results, content, {
+        baseUrl: settings.baseUrl,
+        lang: navigator.language,
+        vocab,
+        onNavigate: (nextWord) => void runLookup(nextWord),
+        onNotify: notify,
+        isDarkMode: dark,
+        audioEnabled: settings.enableAudio,
+      // 翻译模式下「翻译」标签默认激活
+      translate: {
+        text: word,
+        targetLang: settings.translateTargetLang,
+        active: translateActive,
+        dictEmptyText: dictEmptyText ?? null,
+        sendBackground: (message) => chrome.runtime.sendMessage(message),
+      },
+      // 在线词典：服务端聚合 Wikipedia/Wiktionary/百度百科，懒加载
+      online: {
+        text: word,
+        lang: guessSourceLang(word).slice(0, 2),
+        active: false,
+        lookup: (w, l) =>
+          chrome.runtime.sendMessage({ type: MSG.ONLINE_LOOKUP, payload: { word: w, lang: l } }),
+        openExternal: (url) => void chrome.tabs.create({ url }),
+      },
+      // popup 是 460px 小窗，扫描图在弹窗内永远放不大——点大图开独立标签页承载灯箱，
+      // 那里才是真全屏（面板里点图仍然是就地遮罩）
+      openImages: (urls, index, alt) => {
+        const query = new URLSearchParams({
+          urls: JSON.stringify(urls),
+          index: String(index),
+          alt,
+        })
+        void chrome.tabs.create({ url: `lightbox.html?${query.toString()}` })
+      },
+    })
+  }
+
+  if (translate) {
+    // 翻译不依赖 MyDict：先把译文视图立起来，词典分组等查询回来再补——
+    // 服务端对长句的模糊查询可能很慢甚至超时，不能让它挡住译文
+    clearContent()
+    renderWith([], true)
+  } else {
+    renderLoading(word)
+  }
+
+  const result = await chrome.runtime.sendMessage({ type: MSG.QUERY, payload: { word } })
+  if (token !== requestToken) return
+
+  if (!result?.ok) {
+    // 查词不命中（EMPTY）：
+    //   - 翻译候选（≥6 字 / ≥3 词）→ 自动切到翻译线路
+    //   - 短词 → 留在词典错误页 + 手动「翻译」按钮（不自动切，避免「还没查就跑翻译」）
+    if (result.code === CODE.EMPTY) {
+      if (translate) {
+        notify('ok', '没有词典收录这段文字，看「翻译」标签即可')
+      } else if (isTranslateCandidate(word)) {
+        clearContent()
+        renderWith([], true, `「${word}」没有命中任何词典`)
+        notify('ok', `没有词典收录「${word}」，已切换到翻译`)
+      } else {
+        renderState(
+          { ...STATE_COPY[CODE.EMPTY], detail: '也可以改走翻译线路。' },
+          {
+            onTranslate: () => {
+              clearContent()
+              renderWith([], true, `「${word}」没有命中任何词典`)
+            },
+          },
+        )
+      }
+      return
+    }
+    if (translate) {
+      // 译文视图保留，词典这边的结果用 toast 说明
+      notify('error', `词典查询失败（${STATE_COPY[result.code]?.title ?? result.message}），译文不受影响`)
+    } else {
+      const copy = STATE_COPY[result?.code] ?? STATE_COPY[CODE.ERROR]
+      renderState({ ...copy, detail: copy.detail || result?.message || '' })
+    }
+    return
+  }
+
+  const { results, hitWord } = result.data
+  if (!translate) searchInput.value = hitWord
+  // translate 模式重渲染时翻译标签保持激活（译文命中缓存，瞬时补上）
+  renderWith(results, translate)
 }
 
 function submit() {
   const word = searchInput.value.trim()
   if (!word) return
-  void runLookup(word)
+  // 线路自动判定：像句子（全非字母≥6字 / 英文≥3词）→ 翻译；否则查词典。
+  // 面板里语言标签右边有「翻译」标签，两条线路随时可切。
+  void runLookup(word, { translate: isTranslateCandidate(word) })
 }
 
 searchInput.addEventListener('keydown', (event) => {
@@ -231,7 +305,7 @@ backBtn.addEventListener('click', () => {
   history.pop()
   const previous = history[history.length - 1]
   history.pop()
-  void runLookup(previous)
+  void runLookup(previous.text, { translate: previous.translate })
 })
 
 // 方向键导航：↑/↓ 在命中的词典分组间切换（关当前、开相邻），←/→ 切语言标签。

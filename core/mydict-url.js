@@ -33,6 +33,20 @@ export function buildQueryUrl(base, word) {
   return url.toString()
 }
 
+/**
+ * `<base>/api/dict/online/lookup?word=&lang=` —— 服务端聚合的在线词典
+ * （Wikipedia / Wiktionary / 百度百科 + 外部搜索链接）。
+ *
+ * lang 是 2 字母码（zh/ja/en…，服务端正则 `^[a-z]{2}(-[A-Za-z]{2,4})?$`）。
+ * 无 CORS 头，和 /api/v1/query 一样只能在 background 发。
+ */
+export function buildOnlineLookupUrl(base, word, lang) {
+  const url = new URL(`${normalizeBase(base)}/api/dict/online/lookup`)
+  url.searchParams.set('word', word)
+  url.searchParams.set('lang', lang)
+  return url.toString()
+}
+
 /** `<base>/api/v1/vocab`
  *
  * 服务端自己查词条并快照音标/释义，所以客户端只发词 + 来源词典 id。

@@ -75,6 +75,8 @@ export function createTriggerIcon({ onActivate }) {
   style.textContent = ICON_CSS
   const button = document.createElement('button')
   button.type = 'button'
+  // 形态随选区类型切换：像词 → 「词」（查词典）；像句子 → 「译」（走翻译）。
+  // 切换由 show() 的 mode 参数驱动，点击行为不变（都打开面板，面板里再切标签）。
   button.textContent = '词'
   button.title = '用 MyDict 查这个词'
   button.setAttribute('aria-label', '用 MyDict 查这个词')
@@ -87,7 +89,12 @@ export function createTriggerIcon({ onActivate }) {
   })
   shadow.append(style, button)
 
-  function show(rect) {
+  function show(rect, mode = 'word') {
+    const translate = mode === 'translate'
+    button.textContent = translate ? '译' : '词'
+    const title = translate ? '用 MyDict 翻译这段文字（点「词」也可查词典）' : '用 MyDict 查这个词'
+    button.title = title
+    button.setAttribute('aria-label', title)
     const { left, top } = computeIconPlacement(rect, ICON_SIZE)
     applyImmune(host, { display: 'block', top: top + 'px', left: left + 'px' })
   }

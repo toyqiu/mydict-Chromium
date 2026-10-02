@@ -9,9 +9,10 @@
  *   词典 CSS  ──✗──>  面板 shadow；只在它自己那层 shadow 里生效
  */
 
-import { CODE } from '../core/protocol.js'
+import { CODE, MSG } from '../core/protocol.js'
+import { guessSourceLang, isTranslateCandidate } from '../core/translator.js'
 import { PANEL_CSS, DICT_CHROME_CSS } from '../render/styles.js'
-import { renderResults } from '../render/renderer.js'
+import { renderResults as renderResultsImpl } from '../render/renderer.js'
 import { isLightboxOpen, closeLightbox } from '../render/lightbox.js'
 import { computePlacement, isAnchorVisible, setImmuneStyles } from './position.js'
 import { UI_ATTR, remeasureSelectionRect } from './selection.js'
@@ -125,7 +126,7 @@ export function createPanel({ lookup, vocab, getSettings, openOptions }) {
     content.textContent = ''
   }
 
-  function renderState(copy) {
+  function renderState(copy, { onTranslate } = {}) {
     clearContent()
     const state = document.createElement('div')
     state.className = 'state'
@@ -148,6 +149,15 @@ export function createPanel({ lookup, vocab, getSettings, openOptions }) {
       void runLookup(history[history.length - 1], { keepHistory: true }),
     )
     actions.appendChild(retry)
+    // 词典不命中的出口：手动改走翻译线路（短词不自动切，避免「还没查就跑翻译」的观感）
+    if (onTranslate) {
+      const tr = document.createElement('button')
+      tr.type = 'button'
+      tr.textContent = '翻译'
+      tr.title = '改用 Edge 翻译这段文字'
+      tr.addEventListener('click', onTranslate)
+      actions.appendChild(tr)
+    }
     if (copy.setup) {
       const setup = document.createElement('button')
       setup.type = 'button'
@@ -175,22 +185,93 @@ export function createPanel({ lookup, vocab, getSettings, openOptions }) {
     content.appendChild(state)
   }
 
-  async function runLookup(word, { keepHistory = false } = {}) {
+  async function runLookup(word, { keepHistory = false, translate = false } = {}) {
     const token = ++requestToken
     if (!keepHistory) history.push(word)
     backBtn.hidden = history.length <= 1
     wordEl.textContent = word
     fromEl.textContent = ''
     speakBtn.hidden = typeof speechSynthesis === 'undefined'
-    renderLoading(word)
 
     const settings = await getSettings()
+    const dark =
+      settings.theme === 'dark' ||
+      (settings.theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    host.setAttribute('data-theme', dark ? 'dark' : 'light')
+
+    const renderWith = (results, translateActive, dictEmptyText) => {
+      renderApi = renderResultsImpl(results, content, {
+        baseUrl: settings.baseUrl,
+        lang: document.documentElement.lang || navigator.language,
+        vocab,
+        onNavigate: (nextWord) => void runLookup(nextWord),
+        onNotify: notify,
+        isDarkMode: dark,
+        audioEnabled: settings.enableAudio,
+        // 翻译模式下「翻译」标签默认激活；译文请求自带缓存与 background 降级
+        translate: {
+          text: word,
+          targetLang: settings.translateTargetLang,
+          active: translateActive,
+          // 词典查过且为空时给「词典」标签看说明，词典线路不失联
+          dictEmptyText: dictEmptyText ?? null,
+          sendBackground: (message) => chrome.runtime.sendMessage(message),
+        },
+        // 在线词典：服务端聚合 Wikipedia/Wiktionary/百度百科，懒加载
+        online: {
+          text: word,
+          lang: guessSourceLang(word).slice(0, 2),
+          active: false,
+          lookup: (w, l) =>
+            chrome.runtime.sendMessage({ type: MSG.ONLINE_LOOKUP, payload: { word: w, lang: l } }),
+          openExternal: (url) => window.open(url, '_blank', 'noopener'),
+        },
+      })
+    }
+
+    if (translate) {
+      // 翻译不依赖 MyDict：先把译文视图立起来，词典分组等查询回来再补——
+      // 服务端对长句的模糊查询可能很慢甚至超时，不能让它挡住译文
+      clearContent()
+      renderWith([], true)
+    } else {
+      renderLoading(word)
+    }
+
     const result = await lookup(word, settings)
     if (token !== requestToken || !isOpen) return // 期间关了面板或又查了新词
 
     if (!result?.ok) {
-      const copy = STATE_COPY[result?.code] ?? STATE_COPY[CODE.ERROR]
-      renderState({ ...copy, detail: copy.detail || result?.message || '' })
+      // 查词不命中（EMPTY）：
+      //   - 翻译候选（≥6 字 / ≥3 词）→ 自动切到翻译线路
+      //   - 短词 → 留在词典错误页 + 手动「翻译」按钮（不自动切，避免「还没查就跑翻译」）
+      if (result.code === CODE.EMPTY) {
+        if (translate) {
+          notify('ok', '没有词典收录这段文字，看「翻译」标签即可')
+        } else if (isTranslateCandidate(word)) {
+          clearContent()
+          renderWith([], true, `「${word}」没有命中任何词典`)
+          notify('ok', `没有词典收录「${word}」，已切换到翻译`)
+        } else {
+          renderState(
+            { ...STATE_COPY[CODE.EMPTY], detail: '也可以改走翻译线路。' },
+            {
+              onTranslate: () => {
+                clearContent()
+                renderWith([], true, `「${word}」没有命中任何词典`)
+              },
+            },
+          )
+        }
+        return
+      }
+      if (translate) {
+        // 译文视图保留，词典这边的结果用 toast 说明（重渲染会打断用户读译文）
+        notify('error', `词典查询失败（${STATE_COPY[result.code]?.title ?? result.message}），译文不受影响`)
+      } else {
+        const copy = STATE_COPY[result?.code] ?? STATE_COPY[CODE.ERROR]
+        renderState({ ...copy, detail: copy.detail || result?.message || '' })
+      }
       return
     }
 
@@ -198,21 +279,8 @@ export function createPanel({ lookup, vocab, getSettings, openOptions }) {
     wordEl.textContent = hitWord
     // 选区原文与真正命中的词头不同（大小写/词形还原）时说清楚，免得用户以为查错了
     if (word !== hitWord) fromEl.textContent = `（${word}）`
-
-    const dark =
-      settings.theme === 'dark' ||
-      (settings.theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-    host.setAttribute('data-theme', dark ? 'dark' : 'light')
-
-    renderApi = renderResults(results, content, {
-      baseUrl: settings.baseUrl,
-      lang: document.documentElement.lang || navigator.language,
-      vocab,
-      onNavigate: (nextWord) => void runLookup(nextWord),
-      onNotify: notify,
-      isDarkMode: dark,
-      audioEnabled: settings.enableAudio,
-    })
+    // translate 模式重渲染时翻译标签保持激活（译文命中缓存，瞬时补上）
+    renderWith(results, translate)
   }
 
   /** 按锚点重新摆放。滚动时反复调用。 */
@@ -236,12 +304,12 @@ export function createPanel({ lookup, vocab, getSettings, openOptions }) {
 
   let currentSettings = null
 
-  function open(word, rect, settings) {
+  function open(word, rect, settings, { translate = false } = {}) {
     currentSettings = settings
     anchorRect = rect
     isOpen = true
     history = []
-    void runLookup(word)
+    void runLookup(word, { translate })
     // 先算好位置再显示（定位不依赖面板的实际高度，靠 top/bottom 锚定）
     reposition()
     setImmuneStyles(host, { display: 'block' })

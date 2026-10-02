@@ -7,6 +7,7 @@
 
 import { CODE, MSG, fail, ok } from '../core/protocol.js'
 import { buildLookupCandidates } from '../core/lookup-candidates.js'
+import { edgeTranslate } from '../core/translator.js'
 import { getSettings } from '../core/settings.js'
 import { createCache } from './cache.js'
 import * as client from './mydict-client.js'
@@ -75,6 +76,19 @@ async function handleVocabRemove(settings, { itemId } = {}) {
 }
 
 /**
+ * 翻译兜底：content script 直连 edge 端点被页面 CSP 拦掉时走这条通道。
+ * 正常情况下请求根本不会到这里（见 core/translator.js 的注释）。
+ */
+async function handleTranslate({ texts, from, to } = {}) {
+  if (!Array.isArray(texts) || texts.length === 0 || typeof to !== 'string' || !to) {
+    return fail(CODE.ERROR, '翻译参数不完整')
+  }
+  const trimmed = texts.map((t) => String(t ?? '').trim()).filter(Boolean)
+  if (trimmed.length === 0) return ok([])
+  return ok(await edgeTranslate(trimmed, { from, to }))
+}
+
+/**
  * 消息入口。所有 handler 都是「拿最新设置 → 干活 → 收敛错误」的同一形状。
  * 返回值一定是 {ok:true,...} 或 {ok:false,...}，绝不抛出去（抛出去 content 只能看到
  * 一个没有信息量的 "message port closed"）。
@@ -87,6 +101,10 @@ export async function route(message) {
       chrome.runtime.openOptionsPage()
       return ok({})
     }
+    // 翻译兜底同样不需要 MyDict 设置（Edge 接口与 MyDict 无关）
+    if (type === MSG.TRANSLATE) {
+      return await handleTranslate(message?.payload)
+    }
 
     const settings = await getSettings()
     const payload = message?.payload || {}
@@ -94,6 +112,8 @@ export async function route(message) {
     switch (type) {
       case MSG.QUERY:
         return await handleQuery(settings, payload)
+      case MSG.ONLINE_LOOKUP:
+        return ok(await client.onlineLookup(settings, payload))
       case MSG.VOCAB_LIST:
         return await handleVocabList(settings, payload)
       case MSG.VOCAB_ADD:

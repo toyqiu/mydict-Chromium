@@ -17,6 +17,7 @@ import {
   buildVocabItemUrl,
   buildVocabListUrl,
   buildVocabUrl,
+  buildOnlineLookupUrl,
   normalizeBase,
   originPattern,
 } from '../core/mydict-url.js'
@@ -108,6 +109,29 @@ async function requestJson(url, { method = 'GET', token, body, timeoutMs } = {})
 export async function query(settings, word) {
   const { base, token } = await ensureReady(settings)
   return requestJson(buildQueryUrl(base, word), { token, timeoutMs: QUERY_TIMEOUT_MS })
+}
+
+/**
+ * 在线词典聚合（Wikipedia / Wiktionary / 百度百科 + 外部搜索链接）。
+ *
+ * 与 /api/v1/query 一样无 CORS 头，只能在 background 发。服务端有自己的限流与
+ * 600s 缓存；总开关（online_dict_enabled）关着时返回 403，这里转成 UNSUPPORTED，
+ * UI 显示「未开启」而不是误导性的「Token 不对」。
+ */
+export async function onlineLookup(settings, { word, lang }) {
+  const { base, token } = await ensureReady(settings)
+  try {
+    return await requestJson(buildOnlineLookupUrl(base, word, lang), {
+      token,
+      timeoutMs: QUERY_TIMEOUT_MS,
+    })
+  } catch (error) {
+    if (error instanceof MydictError && error.code === CODE.AUTH) {
+      // 403 在这个端点上语义是「功能未开启」，不是鉴权问题
+      throw new MydictError(CODE.UNSUPPORTED, '在线词典未开启（MyDict 管理后台 → 系统设置）')
+    }
+    throw error
+  }
 }
 
 /** 该词在生词本里的记录，返回 `{ [dictionaryId]: itemId }`。 */
