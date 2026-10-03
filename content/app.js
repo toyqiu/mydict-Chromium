@@ -15,6 +15,7 @@ import { createTriggerIcon } from './trigger-icon.js'
 import { createVocabCapability } from './vocab.js'
 import {
   SELECTION_DEBOUNCE_MS,
+  SELECTION_TOUCH_SETTLE_MS,
   isInEditable,
   isSelectionCollapsed,
   readSelection,
@@ -131,6 +132,20 @@ export function start() {
       selectionTimer = setTimeout(handleSelectionChanged, SELECTION_DEBOUNCE_MS)
     },
     true,
+  )
+
+  // 触屏补充触发：安卓系内核的 selectionchange 在「长按选词 / 拖动手柄」手势里的时序
+  // 不稳——有的内核整个手势结束才补发，有的补发时选区 rect 还没布局好，只靠它浮标
+  // 经常不出现（真机反馈：Chromium 系手机浏览器浮标完全不出现）。touchend 后延迟
+  // 复查一次选区作为兜底；桌面端不会派发 touchend，无感。
+  document.addEventListener(
+    'touchend',
+    () => {
+      if (!settings || blockedHere()) return
+      clearTimeout(selectionTimer)
+      selectionTimer = setTimeout(handleSelectionChanged, SELECTION_TOUCH_SETTLE_MS)
+    },
+    { capture: true, passive: true },
   )
 
   // 双击是一个明确的手势：三种模式下都直接开面板

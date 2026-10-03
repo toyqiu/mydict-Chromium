@@ -82,9 +82,22 @@ export function createTriggerIcon({ onActivate }) {
   button.setAttribute('aria-label', '用 MyDict 查这个词')
   // 按下时就阻止默认行为，否则会把已经建立的选区清掉，面板拿不到词
   button.addEventListener('pointerdown', (event) => event.preventDefault())
+  // 触屏直达激活：部分安卓内核在 pointerdown 被阻止默认后不再派发 click，浮标点了
+  // 没反应。触摸路径在 pointerup 直接激活，并压掉随后可能出现的合成 click 避免
+  // 开两次面板（桌面鼠标路径照旧走 click）。
+  let touchActivated = false
+  button.addEventListener('pointerup', (event) => {
+    if (event.pointerType !== 'touch') return
+    touchActivated = true
+    onActivate()
+    setTimeout(() => {
+      touchActivated = false
+    }, 500)
+  })
   button.addEventListener('click', (event) => {
     event.preventDefault()
     event.stopPropagation()
+    if (touchActivated) return
     onActivate()
   })
   shadow.append(style, button)

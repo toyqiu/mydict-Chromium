@@ -14,6 +14,9 @@ import { MAX_LOOKUP_LENGTH } from '../core/lookup-candidates.js'
 /** 选区变化很密集（拖选时每移动一下都触发），等手停稳一点再处理。 */
 export const SELECTION_DEBOUNCE_MS = 180
 
+/** 触屏：touchend 后留这么久，等原生的选区手柄/菜单就位再复查选区。 */
+export const SELECTION_TOUCH_SETTLE_MS = 300
+
 /** 我们的 UI 宿主都带这个属性，用来把自己排除在选区处理之外。 */
 export const UI_ATTR = 'data-myreader-dict-ui'
 
