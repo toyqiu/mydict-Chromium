@@ -509,6 +509,8 @@ export function renderResults(results, container, options) {
         () => {
           audioNote.hidden = true
         },
+        // 页面上下文（划词面板）里的发音兜底通道：background 取字节转 data URL
+        options.sendBackground,
       )
     }
 

@@ -36,6 +36,12 @@ export const MSG = {
    * {texts: string[], from?, to?} -> string[]
    */
   TRANSLATE: 'TRANSLATE',
+  /**
+   * content → background：发音兜底通道。页面上下文里 <audio> 直连 MyDict 的 mp3 可能被
+   * 页面 CSP(media-src)/跨站媒体策略/网络 shields 拦掉（弹窗是扩展页面不受限），background
+   * 取回字节转 data URL 后在页面里播。{url} -> {dataUrl, mime}
+   */
+  AUDIO_FETCH: 'AUDIO_FETCH',
 }
 
 export const CODE = {

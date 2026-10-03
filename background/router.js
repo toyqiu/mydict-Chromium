@@ -114,6 +114,9 @@ export async function route(message) {
         return await handleQuery(settings, payload)
       case MSG.ONLINE_LOOKUP:
         return ok(await client.onlineLookup(settings, payload))
+      case MSG.AUDIO_FETCH:
+        // 发音兜底：不需要 MyDict 设置（URL 已由 content 侧解析成绝对地址）
+        return ok(await client.audioFetch(payload?.url))
       case MSG.VOCAB_LIST:
         return await handleVocabList(settings, payload)
       case MSG.VOCAB_ADD:

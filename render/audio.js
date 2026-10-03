@@ -14,7 +14,14 @@
  * 而且 SPX 目录里通常本来就有一份真 mp3**，所以候选链先试 .mp3 基本就命中了。
  * 走到最后仍失败时给一条明确的提示，而不是静默「没声音」。
  *
- * TODO(M3)：真正的 .spx 解码（vendored 的 libspeex-js 三件套已在 vendor/speex/）。
+ * 触屏（bindPlay 的 pointerup 通道）：部分安卓内核在触摸序列里吞掉合成 click，只挂
+ * click 的发音点击会静默无反应（v0.2.4 浮标同款问题）——pointerup(touch) 直接播放并
+ * 压掉 500ms 内的合成 click；鼠标路径照旧走 click。
+ *
+ * 页面上下文的兜底（playChain 的 background 候选）：面板的 <audio> 在**网页**上下文里
+ * 直连 MyDict 的 mp3，可能被页面 CSP(media-src)/跨站媒体策略/浏览器 shields 拦掉
+ * （手机端实测：弹窗发音正常、面板无声）。background 的 fetch 与词典查询同一条路，
+ * 取回字节转 data URL 交给页面播放；扩展页面（弹窗/lightbox 页）直连从不失败，不走兜底。
  */
 
 /** 绑定标记：外链处理看到它就跳过，避免同一个发音点击被绑两次。 */
@@ -51,8 +58,20 @@ export function audioCandidates(url) {
 /** play() 被自动播放策略拦下时置位，候选链走完后给出针对性的提示。 */
 let blockedByPolicy = false
 
+/** 最近一次媒体加载失败的细节（音频提示条的诊断依据）。 */
+let lastMediaError = ''
+
+/**
+ * 共享 <audio> 的加载代际：换候选（重设 src）不会取消上一个资源的 error 事件——
+ * 它是异步派发的，会在**下一个候选已经挂上监听之后**才到，把新候选当成失败者毒死
+ * （真机表现：第一个候选失败后，后面所有候选无论好坏都报「音频加载失败」）。
+ * 每次试播自增代际，error 处理器只认当前代际。
+ */
+let loadGeneration = 0
+
 /** 试播一个地址。resolve(true)=真的开始放了；resolve(false)=这个地址不行，换下一个。 */
 function tryPlay(audio, url) {
+  const generation = ++loadGeneration
   return new Promise((resolve) => {
     let settled = false
     const finish = (value) => {
@@ -61,15 +80,22 @@ function tryPlay(audio, url) {
       audio.removeEventListener('error', onError)
       resolve(value)
     }
-    const onError = () => finish(false)
+    const onError = () => {
+      if (generation !== loadGeneration) return // 陈旧加载的错误：已经在放别的候选了
+      lastMediaError = audio.error?.message || ''
+      finish(false)
+    }
 
-    audio.addEventListener('error', onError, { once: true })
+    audio.addEventListener('error', onError)
     audio.src = url
     audio.load()
     audio.play().then(
-      () => finish(true),
+      () => {
+        if (generation !== loadGeneration) return
+        finish(true)
+      },
       (error) => {
-        audio.removeEventListener('error', onError)
+        if (generation !== loadGeneration) return
         if (error?.name === 'NotAllowedError') {
           // 手势丢了：自动播放策略拦的。换候选也一样会被拦，直接报出来。
           blockedByPolicy = true
@@ -80,38 +106,61 @@ function tryPlay(audio, url) {
   })
 }
 
-async function playChain(url, onFail, onSuccess) {
+/** 是否运行在网页上下文（划词面板）；扩展页面（弹窗/lightbox 页）false。 */
+const isPageContext = () =>
+  !location.protocol.startsWith('chrome-') && !location.protocol.startsWith('moz-')
+
+/** 让 background 取回音频字节转 data URL（audioFetch 端见 background/mydict-client.js）。 */
+async function playViaBackground(url, sendBackground) {
+  if (!sendBackground) throw new Error('没有后台中转通道')
+  const result = await sendBackground({ type: 'AUDIO_FETCH', payload: { url } })
+  if (!result?.ok) throw new Error(result?.message || '音频中转失败')
+  return result.data.dataUrl
+}
+
+async function playChain(url, onFail, onSuccess, sendBackground) {
   const audio = getPlayer()
   blockedByPolicy = false
-  for (const candidate of audioCandidates(url)) {
-    const played = await tryPlay(audio, candidate)
-    if (played) {
-      onSuccess?.()
-      return
+  const candidates = [...audioCandidates(url)]
+  // 页面上下文才带 data-URL 兜底候选：扩展页面直连从不失败，多一层纯属浪费
+  if (isPageContext() && sendBackground) {
+    candidates.push(`background:${url}`)
+  }
+
+  let lastError = ''
+  for (const candidate of candidates) {
+    try {
+      const src = candidate.startsWith('background:')
+        ? await playViaBackground(candidate.slice('background:'.length), sendBackground)
+        : candidate
+      const played = await tryPlay(audio, src)
+      if (played) {
+        onSuccess?.()
+        return
+      }
+      lastError = lastError || lastMediaError || '音频加载失败'
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error)
     }
     if (blockedByPolicy) break
   }
   onFail?.(
     blockedByPolicy
       ? '播放被浏览器拦截（没有点击手势），再点一次'
-      : SPX_EXT_RE.test(url)
+      : SPX_EXT_RE.test(url) && !lastError
         ? '这个 .spx 没有同名的 mp3，当前版本还解不了 Speex'
-        : '音频加载失败',
+        : lastError || '音频加载失败',
   )
 }
 
 /**
- * 给发音元素绑定播放：click + 触屏 pointerup 双通道。
- *
- * 触屏通道必须有的原因（与 trigger-icon.js 的浮标同款内核怪癖）：部分安卓内核在
- * `pointerdown`/触摸序列里吞掉合成 click——发音锚点的 click 监听永远不触发，表象就是
- * 「点音标无声」。所以 `pointerup`（pointerType=touch）直接播放，并压掉随后可能出现的
- * 合成 click 防止播两次；鼠标路径照旧走 click。
+ * 给单个发音元素绑 click + 触屏 pointerup 双通道。
  *
  * @param {HTMLElement} el
  * @param {() => string} getUrl
+ * @param {(url: string) => void} play
  */
-function bindPlay(el, getUrl) {
+function bindPlay(el, getUrl, play) {
   el.dataset[AUDIO_BOUND] = '1'
   let touchPlayed = false
   el.addEventListener('pointerup', (event) => {
@@ -139,20 +188,22 @@ function bindPlay(el, getUrl) {
  * @param {(resourcePath: string) => string} resolve 把词条里的相对路径解析成可加载的绝对地址
  * @param {(message: string) => void} [onFail]
  * @param {() => void} [onSuccess]
+ * @param {(message: object) => Promise} [sendBackground] 网页上下文里的发音兜底通道
+ *   （renderer 传 chrome.runtime.sendMessage；弹窗是扩展页面，不需要）
  */
-export function wireDictAudio(root, resolve, onFail, onSuccess) {
-  const play = (url) => playChain(url, onFail, onSuccess)
+export function wireDictAudio(root, resolve, onFail, onSuccess, sendBackground) {
+  const play = (url) => playChain(url, onFail, onSuccess, sendBackground)
 
   for (const anchor of root.querySelectorAll('a[href]')) {
     const href = anchor.getAttribute('href') ?? ''
     if (!AUDIO_EXT_RE.test(href)) continue
-    bindPlay(anchor, () => resolve(href))
+    bindPlay(anchor, () => resolve(href), play)
   }
 
   // 千篇的发音按钮：url 在 data-mp3 上，href 是 "#" 或没有
   for (const el of root.querySelectorAll('[data-mp3]')) {
     const url = el.getAttribute('data-mp3') ?? ''
     if (!url) continue
-    bindPlay(el, () => url)
+    bindPlay(el, () => url, play)
   }
 }

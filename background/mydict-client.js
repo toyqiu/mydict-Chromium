@@ -106,6 +106,31 @@ async function requestJson(url, { method = 'GET', token, body, timeoutMs } = {})
   }
 }
 
+/** 取回音频字节转 data URL（发音兜底通道用）。上限 10MB，超了直接拒。 */
+export async function audioFetch(url) {
+  const target = new URL(url)
+  if (!/^https?:$/.test(target.protocol)) {
+    throw new MydictError(CODE.ERROR, '只支持 http(s) 音频地址')
+  }
+  const response = await fetch(target, { signal: AbortSignal.timeout(15000) })
+  if (!response.ok) {
+    throw new MydictError(codeFromStatus(response.status), `HTTP ${response.status}`, response.status)
+  }
+  const mime = (response.headers.get('content-type') ?? 'audio/mpeg').split(';')[0].trim()
+  const buffer = await response.arrayBuffer()
+  if (buffer.byteLength > 10 * 1024 * 1024) {
+    throw new MydictError(CODE.ERROR, '音频文件超过 10MB，不再中转')
+  }
+  // 分块转 base64：一次性 String.fromCharCode 在大文件上会爆栈
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  const CHUNK = 0x8000
+  for (let offset = 0; offset < bytes.length; offset += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + CHUNK))
+  }
+  return { dataUrl: `data:${mime};base64,${btoa(binary)}`, mime }
+}
+
 /** 查一个词，返回服务端原始 `{results}`。 */
 export async function query(settings, word) {
   const { base, token } = await ensureReady(settings)
