@@ -102,13 +102,13 @@ export function createTriggerIcon({ onActivate }) {
   })
   shadow.append(style, button)
 
-  function show(rect, mode = 'word') {
+  function show(rect, mode = 'word', placement = 'br') {
     const translate = mode === 'translate'
     button.textContent = translate ? '译' : '词'
     const title = translate ? '用 MyDict 翻译这段文字（点「词」也可查词典）' : '用 MyDict 查这个词'
     button.title = title
     button.setAttribute('aria-label', title)
-    const { left, top } = computeIconPlacement(rect, ICON_SIZE)
+    const { left, top } = computeIconPlacement(rect, ICON_SIZE, placement)
     applyImmune(host, { display: 'block', top: top + 'px', left: left + 'px' })
   }
 

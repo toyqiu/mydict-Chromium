@@ -119,9 +119,14 @@ export function start() {
       return
     }
 
-    // icon 模式：浮标形态随线路走——像句子显示「译」，像词显示「词」
+    // icon 模式：浮标形态随线路走——像句子显示「译」，像词显示「词」；
+    // 位置取设置项 iconPlacement（安卓选择手柄会挡住右下角，用户可换角）
     iconAnchor = selection.rect
-    icon.show(selection.rect, isTranslateCandidate(selection.text) ? 'translate' : 'word')
+    icon.show(
+      selection.rect,
+      isTranslateCandidate(selection.text) ? 'translate' : 'word',
+      settings.iconPlacement,
+    )
   }
 
   let selectionTimer = 0
@@ -176,7 +181,7 @@ export function start() {
         // 浮标跟着选区走；滚出视口就收起来
         const rect = currentSelectionRect()
         iconAnchor = rect
-        if (rect) icon.show(rect)
+        if (rect) icon.show(rect, undefined, settings.iconPlacement)
         else icon.hide()
       }
       if (panel.isOpen) panel.follow()

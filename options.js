@@ -44,6 +44,7 @@ function fillForm(settings) {
     input.checked = input.value === settings.trigger
   }
   $('disableInInputs').checked = settings.disableInInputs
+  $('iconPlacement').value = settings.iconPlacement ?? 'br'
   $('blocklist').value = (settings.blocklist || []).join('\n')
   $('panelWidth').value = settings.panelWidth
   $('fontScale').value = settings.fontScale
@@ -79,6 +80,7 @@ function readForm() {
     token: $('token').value.trim(),
     trigger: checked ? checked.value : DEFAULTS.trigger,
     disableInInputs: $('disableInInputs').checked,
+    iconPlacement: $('iconPlacement').value,
     blocklist: $('blocklist')
       .value.split('\n')
       .map((line) => line.trim())

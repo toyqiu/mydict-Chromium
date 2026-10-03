@@ -76,6 +76,19 @@
           </label>
         </div>
 
+        <div class="field">
+          <span class="label">浮标位置（贴选区的哪个角）</span>
+          <select id="iconPlacement">
+            <option value="br">右下（默认）</option>
+            <option value="tr">右上</option>
+            <option value="bl">左下</option>
+            <option value="tl">左上</option>
+          </select>
+          <span class="hint">
+            安卓手机上长按选择的手柄长在选区下沿两端，会挡住右下角的浮标——选「右上」可避开。
+          </span>
+        </div>
+
         <label class="check">
           <input id="disableInInputs" type="checkbox" />
           <span>在输入框 / 可编辑区域里划词时不触发</span>

@@ -49,13 +49,30 @@ export function isAnchorVisible(rect) {
   return rect.bottom > 0 && rect.top < window.innerHeight && rect.right > 0 && rect.left < window.innerWidth
 }
 
-/** 浮标的定位：贴在选区右下角，同样 clamp 在视口内。 */
-export function computeIconPlacement(anchorRect, iconSize) {
+/**
+ * 浮标的定位：贴在选区指定的角上（设置项 iconPlacement），clamp 在视口内。
+ * placement：br=右下（默认，与旧版一致）、tr=右上、bl=左下、tl=左上。
+ */
+export function computeIconPlacement(anchorRect, iconSize, placement = 'br') {
   const viewportW = window.innerWidth
   const viewportH = window.innerHeight
-  const left = Math.min(Math.max(anchorRect.right + 2, MARGIN), viewportW - iconSize - MARGIN)
-  const top = Math.min(Math.max(anchorRect.bottom + 2, MARGIN), viewportH - iconSize - MARGIN)
-  return { left, top }
+  const GAP = 2
+  const place = (horiz, vert) => ({
+    left:
+      horiz === 'r'
+        ? Math.min(Math.max(anchorRect.right + GAP, MARGIN), viewportW - iconSize - MARGIN)
+        : Math.min(Math.max(anchorRect.left - iconSize - GAP, MARGIN), viewportW - iconSize - MARGIN),
+    top:
+      vert === 'b'
+        ? Math.min(Math.max(anchorRect.bottom + GAP, MARGIN), viewportH - iconSize - MARGIN)
+        : Math.min(Math.max(anchorRect.top - iconSize - GAP, MARGIN), viewportH - iconSize - MARGIN),
+  })
+  switch (placement) {
+    case 'tr': return place('r', 't')
+    case 'bl': return place('l', 'b')
+    case 'tl': return place('l', 't')
+    default: return place('r', 'b')
+  }
 }
 
 /**
