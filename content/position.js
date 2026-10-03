@@ -51,21 +51,30 @@ export function isAnchorVisible(rect) {
 
 /**
  * 浮标的定位：贴在选区指定的角上（设置项 iconPlacement），clamp 在视口内。
- * placement：br=右下（默认，与旧版一致）、tr=右上、bl=左下、tl=左上。
+ * placement：br=右下（默认，与旧版一致）、tr=右上、bl=左下、tl=左上、
+ * center=盖在选区正中央（安卓四角都可能被选择手柄挡住时的兜底）。
  */
 export function computeIconPlacement(anchorRect, iconSize, placement = 'br') {
   const viewportW = window.innerWidth
   const viewportH = window.innerHeight
   const GAP = 2
+  const clampX = (left) => Math.min(Math.max(left, MARGIN), viewportW - iconSize - MARGIN)
+  const clampY = (top) => Math.min(Math.max(top, MARGIN), viewportH - iconSize - MARGIN)
+  if (placement === 'center') {
+    return {
+      left: clampX(anchorRect.left + (anchorRect.width - iconSize) / 2),
+      top: clampY(anchorRect.top + (anchorRect.height - iconSize) / 2),
+    }
+  }
   const place = (horiz, vert) => ({
     left:
       horiz === 'r'
-        ? Math.min(Math.max(anchorRect.right + GAP, MARGIN), viewportW - iconSize - MARGIN)
-        : Math.min(Math.max(anchorRect.left - iconSize - GAP, MARGIN), viewportW - iconSize - MARGIN),
+        ? clampX(anchorRect.right + GAP)
+        : clampX(anchorRect.left - iconSize - GAP),
     top:
       vert === 'b'
-        ? Math.min(Math.max(anchorRect.bottom + GAP, MARGIN), viewportH - iconSize - MARGIN)
-        : Math.min(Math.max(anchorRect.top - iconSize - GAP, MARGIN), viewportH - iconSize - MARGIN),
+        ? clampY(anchorRect.bottom + GAP)
+        : clampY(anchorRect.top - iconSize - GAP),
   })
   switch (placement) {
     case 'tr': return place('r', 't')
