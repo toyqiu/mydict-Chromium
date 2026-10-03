@@ -101,6 +101,38 @@ async function playChain(url, onFail, onSuccess) {
 }
 
 /**
+ * 给发音元素绑定播放：click + 触屏 pointerup 双通道。
+ *
+ * 触屏通道必须有的原因（与 trigger-icon.js 的浮标同款内核怪癖）：部分安卓内核在
+ * `pointerdown`/触摸序列里吞掉合成 click——发音锚点的 click 监听永远不触发，表象就是
+ * 「点音标无声」。所以 `pointerup`（pointerType=touch）直接播放，并压掉随后可能出现的
+ * 合成 click 防止播两次；鼠标路径照旧走 click。
+ *
+ * @param {HTMLElement} el
+ * @param {() => string} getUrl
+ */
+function bindPlay(el, getUrl) {
+  el.dataset[AUDIO_BOUND] = '1'
+  let touchPlayed = false
+  el.addEventListener('pointerup', (event) => {
+    if (event.pointerType !== 'touch') return
+    // 阻止默认：既挡住锚点的导航兜底，也压掉内核的合成 mouse 事件序列
+    event.preventDefault()
+    touchPlayed = true
+    play(getUrl())
+    setTimeout(() => {
+      touchPlayed = false
+    }, 500)
+  })
+  el.addEventListener('click', (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (touchPlayed) return
+    play(getUrl())
+  })
+}
+
+/**
  * 给子树里的发音锚点挂上内联播放。
  *
  * @param {HTMLElement} root
@@ -114,23 +146,13 @@ export function wireDictAudio(root, resolve, onFail, onSuccess) {
   for (const anchor of root.querySelectorAll('a[href]')) {
     const href = anchor.getAttribute('href') ?? ''
     if (!AUDIO_EXT_RE.test(href)) continue
-    anchor.dataset[AUDIO_BOUND] = '1'
-    anchor.addEventListener('click', (event) => {
-      event.preventDefault()
-      event.stopPropagation()
-      play(resolve(href))
-    })
+    bindPlay(anchor, () => resolve(href))
   }
 
   // 千篇的发音按钮：url 在 data-mp3 上，href 是 "#" 或没有
   for (const el of root.querySelectorAll('[data-mp3]')) {
     const url = el.getAttribute('data-mp3') ?? ''
     if (!url) continue
-    el.dataset[AUDIO_BOUND] = '1'
-    el.addEventListener('click', (event) => {
-      event.preventDefault()
-      event.stopPropagation()
-      play(url)
-    })
+    bindPlay(el, () => url)
   }
 }
