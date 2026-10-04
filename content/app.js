@@ -10,6 +10,7 @@
 import { MSG } from '../core/protocol.js'
 import { getSettings, isBlocked, onSettingsChanged } from '../core/settings.js'
 import { isTranslateCandidate } from '../core/translator.js'
+import { handleAudioTap } from '../render/audio.js'
 import { createPanel } from './panel.js'
 import { createTriggerIcon } from './trigger-icon.js'
 import { createVocabCapability } from './vocab.js'
@@ -151,6 +152,31 @@ export function start() {
       selectionTimer = setTimeout(handleSelectionChanged, SELECTION_TOUCH_SETTLE_MS)
     },
     { capture: true, passive: true },
+  )
+
+  // 发音兜底（document 捕获阶段）：个别安卓内核对面板内**两层 shadow 嵌套**的词条元素
+  // 不派发 pointerup/click，元素级监听收不到、点音标「完全没反应」（单层 shadow 的浮标没事）。
+  // 这里按 composedPath 兜底识别并播放；桌面端鼠标路径与之重复时由 600ms 防双播压掉。
+  document.addEventListener(
+    'pointerup',
+    (event) => {
+      if (event.pointerType !== 'touch') return
+      if (handleAudioTap(event)) {
+        event.preventDefault()
+        event.stopPropagation()
+      }
+    },
+    true,
+  )
+  document.addEventListener(
+    'click',
+    (event) => {
+      if (handleAudioTap(event)) {
+        event.preventDefault()
+        event.stopPropagation()
+      }
+    },
+    true,
   )
 
   // 双击是一个明确的手势：三种模式下都直接开面板

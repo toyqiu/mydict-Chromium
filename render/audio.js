@@ -153,6 +153,40 @@ async function playChain(url, onFail, onSuccess, sendBackground) {
   )
 }
 
+/** 最近一次 wiring 的播放入口（document 级委派用；多组词条时以最后一次为准）。 */
+let activePlay = null
+
+/** 防双播：元素级监听与 document 级委派可能同时命中同一次点击。 */
+let recentlyPlayed = { src: '', at: 0 }
+
+/**
+ * document 捕获阶段的发音兜底（app.js 调用）。
+ *
+ * 真机场景：个别安卓内核对**两层 shadow 嵌套**（面板 shadow → 词典 shadow）里的元素
+ * 不派发 pointerup/click——元素级监听永远收不到，点音标「完全没反应」（单层 shadow 的
+ * 浮标没事）。这里在 document 捕获阶段按 composedPath 找带发音标记的节点直接播放，
+ * 事件只要到达页面任何位置就能截住；同一元素 600ms 内的重复触发被压掉。
+ *
+ * @param {Event} event
+ * @returns {boolean} 是否已消费（调用方据此 preventDefault/stopPropagation）
+ */
+export function handleAudioTap(event) {
+  if (!activePlay) return false
+  const path = typeof event.composedPath === 'function' ? event.composedPath() : []
+  for (const node of path) {
+    if (!(node instanceof HTMLElement)) continue
+    const marked = node.dataset?.[AUDIO_BOUND]
+    const src = marked ? node.dataset['dictAudioSrc'] : ''
+    if (!src) continue
+    const now = Date.now()
+    if (recentlyPlayed.src === src && now - recentlyPlayed.at < 600) return true
+    recentlyPlayed = { src, at: now }
+    activePlay(src)
+    return true
+  }
+  return false
+}
+
 /**
  * 给单个发音元素绑 click + 触屏 pointerup 双通道。
  *
@@ -162,6 +196,7 @@ async function playChain(url, onFail, onSuccess, sendBackground) {
  */
 function bindPlay(el, getUrl, play) {
   el.dataset[AUDIO_BOUND] = '1'
+  el.dataset['dictAudioSrc'] = getUrl()
   let touchPlayed = false
   el.addEventListener('pointerup', (event) => {
     if (event.pointerType !== 'touch') return
@@ -193,6 +228,7 @@ function bindPlay(el, getUrl, play) {
  */
 export function wireDictAudio(root, resolve, onFail, onSuccess, sendBackground) {
   const play = (url) => playChain(url, onFail, onSuccess, sendBackground)
+  activePlay = play
 
   for (const anchor of root.querySelectorAll('a[href]')) {
     const href = anchor.getAttribute('href') ?? ''
